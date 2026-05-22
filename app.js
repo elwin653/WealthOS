@@ -1551,7 +1551,8 @@ function selectGoalIcon(icon) {
 function saveSubscription() {
   const id = document.getElementById('sub-edit-id').value;
   const name = document.getElementById('sub-name').value.trim();
-  const icon = document.getElementById('sub-icon').value.trim() || '📦';
+  const iconEl = document.getElementById('sub-icon');
+  const icon = iconEl ? iconEl.value.trim() || '📦' : '📦';
   const amount = parseFloat(document.getElementById('sub-amount').value);
   const cycle = document.getElementById('sub-cycle').value;
   const cat = document.getElementById('sub-cat').value;
@@ -1716,7 +1717,8 @@ function openModal(id) {
   if (id === 'add-sub-modal' && !document.getElementById('sub-edit-id').value) {
     document.getElementById('sub-modal-title').textContent = 'Add Subscription';
     document.getElementById('sub-name').value = '';
-    document.getElementById('sub-icon').value = '';
+    const subIconEl = document.getElementById('sub-icon');
+    if (subIconEl) subIconEl.value = '';
     document.getElementById('sub-amount').value = '';
     document.getElementById('sub-renewal').value = '';
   }
