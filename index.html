@@ -84,6 +84,10 @@
         <div style="font-size:24px">💼</div>
         <div data-i18n="portfolio">Portfolio</div>
       </button>
+      <button class="more-sheet-btn" onclick="navigateFromMore('wallet')">
+        <div style="font-size:24px">💰</div>
+        <div>Wallet</div>
+      </button>
       <button class="more-sheet-btn" onclick="navigateFromMore('settings')">
         <div style="font-size:24px">⚙️</div>
         <div data-i18n="settings">Settings</div>
@@ -115,6 +119,10 @@
       <div class="nav-item" data-page="investments">
         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 18L9 11.25l4.306 4.307a11.95 11.95 0 015.814-5.519l2.74-1.22m0 0l-5.94-2.28m5.94 2.28l-2.28 5.941"/></svg>
         Investments
+      </div>
+      <div class="nav-item" data-page="wallet">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M21 12a2.25 2.25 0 00-2.25-2.25H15a3 3 0 11-6 0H5.25A2.25 2.25 0 003 12m18 0v6a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 18v-6m18 0V9M3 12V9m18 0a2.25 2.25 0 00-2.25-2.25H5.25A2.25 2.25 0 003 9m18 0V6a2.25 2.25 0 00-2.25-2.25H5.25A2.25 2.25 0 003 6v3"/></svg>
+        Wallet
       </div>
       <div class="nav-item" data-page="goals">
         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3 3v1.5M3 21v-6m0 0l2.77-.693a9 9 0 016.208.682l.108.054a9 9 0 006.086.71l3.114-.732a48.524 48.524 0 01-.005-10.499l-3.11.732a9 9 0 01-6.085-.711l-.108-.054a9 9 0 00-6.208-.682L3 4.5M3 15V4.5"/></svg>
@@ -188,7 +196,7 @@
       <!-- Stat Cards Row -->
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:12px 20px 0">
         <div id="dash-income-card" style="background:var(--bg-card);border:1px solid var(--border);border-radius:14px;padding:16px">
-          <div style="font-size:10px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px" data-i18n="monthlyIncome">Monthly Income</div>
+          <div style="font-size:10px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px" data-i18n="monthlyIncome">Income This Month</div>
           <div id="dash-income-val" style="font-size:18px;font-weight:600;color:var(--text-primary);font-variant-numeric:tabular-nums">—</div>
         </div>
         <div id="dash-expense-card" style="background:var(--bg-card);border:1px solid var(--border);border-radius:14px;padding:16px">
@@ -795,10 +803,57 @@
       </div>
     </div>
 
+
+    <!-- ═══════════════════ WALLET ═══════════════════ -->
+    <div class="page" id="page-wallet">
+      <div class="page-header">
+        <div class="page-title">Wallet</div>
+        <div class="page-sub">Cash, banks, assets &amp; liabilities</div>
+      </div>
+      <div id="wallet-content"></div>
+    </div>
+
   </main>
 </div>
 
 <!-- ═══════════ MODALS ═══════════ -->
+<!-- Add Account Modal -->
+<div class="modal-overlay" id="add-account-modal">
+  <div class="modal" style="max-width:420px">
+    <div class="modal-header">
+      <div class="modal-title" id="acct-modal-title">Add Account</div>
+      <div class="modal-close" onclick="closeModal('add-account-modal')">✕</div>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="acct-id">
+      <input type="hidden" id="acct-type">
+      <div style="display:grid;grid-template-columns:60px 1fr;gap:12px;margin-bottom:14px">
+        <div class="form-group" style="margin:0">
+          <label class="form-label">Icon</label>
+          <input type="text" id="acct-icon" class="form-input" maxlength="2" style="text-align:center;font-size:20px">
+        </div>
+        <div class="form-group" style="margin:0">
+          <label class="form-label">Name</label>
+          <input type="text" id="acct-name" class="form-input" placeholder="e.g. Maybank Savings">
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Balance / Value</label>
+        <input type="number" id="acct-balance" class="form-input" placeholder="0.00" min="0" step="0.01">
+      </div>
+      <div class="form-group">
+        <label class="form-label" id="acct-note-label">Notes (optional)</label>
+        <input type="text" id="acct-note" class="form-input" placeholder="e.g. Account number, notes...">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('add-account-modal')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveAccount()">Save</button>
+    </div>
+  </div>
+</div>
+
+
 <!-- Edit Monthly Income Modal -->
 <div class="modal-overlay" id="edit-income-modal">
   <div class="modal" style="max-width:380px">

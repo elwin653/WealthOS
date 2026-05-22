@@ -275,6 +275,7 @@ function renderPage(page) {
     subscriptions: renderSubscriptions,
     calendar: window.renderCalendar,
     'ai-advisor': window.renderAiAdvisor,
+    wallet: window.renderWallet,
     // quickadd removed
     settings: window.renderSettingsPage,
   };
@@ -2801,16 +2802,43 @@ window.toggleHideNumbers = function() {
 // ═══════════════════════════════════════════════════════════
 window.openMoreSheet = function() {
   var sheet = document.getElementById('more-sheet');
+  var overlay = document.getElementById('more-sheet-overlay');
   if (sheet) sheet.classList.add('open');
+  if (overlay) overlay.classList.add('open');
 };
 window.closeMoreSheet = function() {
   var sheet = document.getElementById('more-sheet');
+  var overlay = document.getElementById('more-sheet-overlay');
   if (sheet) sheet.classList.remove('open');
+  if (overlay) overlay.classList.remove('open');
 };
 window.navigateFromMore = function(page) {
   closeMoreSheet();
   navigate(page);
 };
+
+// Swipe down to close More sheet
+(function() {
+  var startY = 0;
+  var sheet = null;
+  document.addEventListener('touchstart', function(e) {
+    sheet = document.getElementById('more-sheet');
+    if (sheet && sheet.classList.contains('open')) {
+      startY = e.touches[0].clientY;
+    }
+  }, { passive: true });
+  document.addEventListener('touchmove', function(e) {
+    if (!sheet || !sheet.classList.contains('open')) return;
+    var dy = e.touches[0].clientY - startY;
+    if (dy > 0) sheet.style.transform = 'translateY(' + dy + 'px)';
+  }, { passive: true });
+  document.addEventListener('touchend', function(e) {
+    if (!sheet || !sheet.classList.contains('open')) return;
+    var dy = e.changedTouches[0].clientY - startY;
+    sheet.style.transform = '';
+    if (dy > 80) closeMoreSheet(); // swipe down > 80px = close
+  }, { passive: true });
+})();
 
 // ═══════════════════════════════════════════════════════════
 // FEATURE: AI Advisor (Claude-powered financial chat)
@@ -3014,4 +3042,137 @@ window.sendAiMessage = async function() {
   sendBtn.style.opacity = '1';
   var container = document.getElementById('ai-messages');
   if (container) container.scrollTop = container.scrollHeight;
+};
+
+// ═══════════════════════════════════════════════════════════
+// FEATURE: Wallet — Cash, Banks, Assets, Liabilities
+// ═══════════════════════════════════════════════════════════
+window.renderWallet = function() {
+  if (!Array.isArray(state.accounts)) state.accounts = [];
+  var sym = curr();
+
+  var cash = state.accounts.filter(function(a){ return a.type === 'cash'; });
+  var banks = state.accounts.filter(function(a){ return a.type === 'bank'; });
+  var assets = state.accounts.filter(function(a){ return a.type === 'asset'; });
+  var liabilities = state.accounts.filter(function(a){ return a.type === 'liability'; });
+
+  function total(arr) { return arr.reduce(function(s,a){ return s + (a.balance||0); }, 0); }
+  var totalCash = total(cash);
+  var totalBank = total(banks);
+  var totalAssets = total(assets);
+  var totalLiab = total(liabilities);
+  var totalInvest = getTotalPortfolioValue ? getTotalPortfolioValue() : 0;
+  var netWorth = totalCash + totalBank + totalAssets + totalInvest - totalLiab;
+
+  function accountRow(a) {
+    return '<div style="display:flex;align-items:center;justify-content:space-between;padding:11px 0;border-bottom:1px solid var(--border)">' +
+      '<div style="display:flex;align-items:center;gap:10px">' +
+        '<div style="font-size:20px">' + (a.icon || '💳') + '</div>' +
+        '<div><div style="font-size:13.5px;font-weight:600">' + a.name + '</div>' +
+        (a.note ? '<div style="font-size:11px;color:var(--text-muted)">' + a.note + '</div>' : '') +
+        '</div>' +
+      '</div>' +
+      '<div style="display:flex;align-items:center;gap:10px">' +
+        '<div style="font-weight:700;font-size:14px;color:' + (a.type==='liability'?'var(--red)':'var(--text-primary)') + '">' +
+          (a.type==='liability'?'-':'') + sym + (a.balance||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}) +
+        '</div>' +
+        '<button onclick="editAccount(\'' + a.id + '\')" style="background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:14px">✏️</button>' +
+        '<button onclick="deleteAccount(\'' + a.id + '\')" style="background:none;border:none;cursor:pointer;color:var(--red);font-size:14px">✕</button>' +
+      '</div>' +
+    '</div>';
+  }
+
+  function section(title, icon, arr, t, btnLabel, btnType) {
+    return '<div class="card" style="margin-bottom:14px">' +
+      '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">' +
+        '<div style="display:flex;align-items:center;gap:8px">' +
+          '<span style="font-size:18px">' + icon + '</span>' +
+          '<div>' +
+            '<div style="font-weight:700;font-size:13px">' + title + '</div>' +
+            '<div style="font-size:11px;color:var(--text-muted)">' + sym + t.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}) + '</div>' +
+          '</div>' +
+        '</div>' +
+        '<button onclick="openAddAccount(\'' + btnType + '\')" class="btn btn-primary btn-sm" style="font-size:11px;padding:5px 10px">+ Add</button>' +
+      '</div>' +
+      (arr.length ? arr.map(accountRow).join('') : '<div style="text-align:center;color:var(--text-muted);font-size:12px;padding:10px 0">No ' + title.toLowerCase() + ' added yet</div>') +
+    '</div>';
+  }
+
+  var el = document.getElementById('wallet-content');
+  if (!el) return;
+
+  el.innerHTML =
+    // Net worth summary
+    '<div class="card" style="margin-bottom:14px;background:var(--bg-elevated)">' +
+      '<div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:6px">Total Net Worth</div>' +
+      '<div style="font-size:28px;font-weight:700;color:var(--text-primary);margin-bottom:12px">' + sym + netWorth.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}) + '</div>' +
+      '<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px">' +
+        '<div style="font-size:12px"><span style="color:var(--text-muted)">Cash: </span><span style="font-weight:600">' + sym + totalCash.toLocaleString('en-US',{maximumFractionDigits:0}) + '</span></div>' +
+        '<div style="font-size:12px"><span style="color:var(--text-muted)">Banks: </span><span style="font-weight:600">' + sym + totalBank.toLocaleString('en-US',{maximumFractionDigits:0}) + '</span></div>' +
+        '<div style="font-size:12px"><span style="color:var(--text-muted)">Investments: </span><span style="font-weight:600">' + sym + totalInvest.toLocaleString('en-US',{maximumFractionDigits:0}) + '</span></div>' +
+        '<div style="font-size:12px"><span style="color:var(--text-muted)">Assets: </span><span style="font-weight:600">' + sym + totalAssets.toLocaleString('en-US',{maximumFractionDigits:0}) + '</span></div>' +
+        '<div style="font-size:12px;color:var(--red)"><span style="color:var(--text-muted)">Liabilities: </span><span style="font-weight:600">-' + sym + totalLiab.toLocaleString('en-US',{maximumFractionDigits:0}) + '</span></div>' +
+      '</div>' +
+    '</div>' +
+    section('Cash on Hand', '💵', cash, totalCash, '+ Add Cash', 'cash') +
+    section('Bank Accounts', '🏦', banks, totalBank, '+ Add Bank', 'bank') +
+    section('Physical Assets', '🏠', assets, totalAssets, '+ Add Asset', 'asset') +
+    section('Liabilities', '💳', liabilities, totalLiab, '+ Add Liability', 'liability');
+};
+
+window.openAddAccount = function(type) {
+  var typeLabels = { cash:'Cash on Hand', bank:'Bank Account', asset:'Physical Asset', liability:'Liability/Loan' };
+  var icons = { cash:'💵', bank:'🏦', asset:'🏠', liability:'💳' };
+  document.getElementById('acct-modal-title').textContent = 'Add ' + (typeLabels[type]||type);
+  document.getElementById('acct-type').value = type;
+  document.getElementById('acct-icon').value = icons[type] || '💳';
+  document.getElementById('acct-name').value = '';
+  document.getElementById('acct-balance').value = '';
+  document.getElementById('acct-note').value = '';
+  document.getElementById('acct-id').value = '';
+  // Show/hide note field hint based on type
+  var noteLbl = document.getElementById('acct-note-label');
+  if (noteLbl) noteLbl.textContent = type === 'bank' ? 'Bank name / account number (optional)' : 'Notes (optional)';
+  openModal('add-account-modal');
+};
+
+window.editAccount = function(id) {
+  var a = (state.accounts || []).find(function(x){ return x.id === id; });
+  if (!a) return;
+  document.getElementById('acct-modal-title').textContent = 'Edit Account';
+  document.getElementById('acct-type').value = a.type;
+  document.getElementById('acct-icon').value = a.icon || '';
+  document.getElementById('acct-name').value = a.name || '';
+  document.getElementById('acct-balance').value = a.balance || '';
+  document.getElementById('acct-note').value = a.note || '';
+  document.getElementById('acct-id').value = a.id;
+  openModal('add-account-modal');
+};
+
+window.saveAccount = function() {
+  var name = document.getElementById('acct-name').value.trim();
+  var balance = parseFloat(document.getElementById('acct-balance').value) || 0;
+  var type = document.getElementById('acct-type').value;
+  var icon = document.getElementById('acct-icon').value.trim() || '💳';
+  var note = document.getElementById('acct-note').value.trim();
+  var id = document.getElementById('acct-id').value;
+  if (!name) { toast('Please enter a name', 'error'); return; }
+  if (!Array.isArray(state.accounts)) state.accounts = [];
+  if (id) {
+    var idx = state.accounts.findIndex(function(a){ return a.id === id; });
+    if (idx !== -1) state.accounts[idx] = { id:id, name:name, balance:balance, type:type, icon:icon, note:note };
+  } else {
+    state.accounts.push({ id: uid(), name:name, balance:balance, type:type, icon:icon, note:note });
+  }
+  save();
+  closeModal('add-account-modal');
+  window.renderWallet();
+  toast('Account saved ✓', 'success');
+};
+
+window.deleteAccount = function(id) {
+  if (!confirm('Delete this account?')) return;
+  state.accounts = state.accounts.filter(function(a){ return a.id !== id; });
+  save();
+  window.renderWallet();
 };

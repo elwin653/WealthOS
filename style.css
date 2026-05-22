@@ -816,8 +816,10 @@ td.td-mono { font-family: 'DM Mono', monospace; font-size: 13px; }
   opacity: 0;
   pointer-events: none;
   z-index: 250;
-  transition: opacity 0.2s;
+  transition: opacity 0.25s;
+  -webkit-backdrop-filter: blur(2px);
   backdrop-filter: blur(2px);
+  display: block !important;
 }
 #more-sheet-overlay.open {
   opacity: 1;
@@ -1127,4 +1129,25 @@ td.td-mono { font-family: 'DM Mono', monospace; font-size: 13px; }
   overflow: hidden;
   text-overflow: ellipsis;
   border: 1px solid rgba(251,191,36,0.3);
+}
+
+/* ── Fix transactions page sizing on mobile ─────────── */
+@media (max-width: 900px) {
+  #page-transactions {
+    padding: 0 !important;
+  }
+  #page-transactions .page-header {
+    padding: 16px 16px 0 !important;
+  }
+  #page-transactions .stat-grid,
+  #page-transactions .card,
+  #page-transactions > div {
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+    border-radius: 0 !important;
+  }
+  #page-transactions .card {
+    border-left: none !important;
+    border-right: none !important;
+  }
 }
