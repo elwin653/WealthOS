@@ -53,7 +53,9 @@ let state = {
   userName: '',
   monthlyIncome: 0,
   budgetLimit: 0,
-  language: 'en'
+  language: 'en',
+  navTabs: ['dashboard', 'wallet', 'transactions', 'investments'],
+  accounts: []
 };
 
 // ── Constants ───────────────────────────────────────────
@@ -260,6 +262,8 @@ function navigate(page) {
   document.getElementById('page-' + page)?.classList.add('active');
   document.querySelectorAll('[data-page="' + page + '"]').forEach(n => n.classList.add('active'));
   window.scrollTo(0, 0);
+  // Rebuild mobile nav to update active state on custom tabs
+  if (typeof buildMobileNav === 'function') buildMobileNav();
   renderPage(page);
 }
 
@@ -1714,7 +1718,9 @@ function confirmReset() {
       transactions: [], investments: [], goals: [], subscriptions: [], networthHistory: [],
       selectedTxnType: 'income', selectedGoalIcon: '🎯', editingGoalId: null, charts: {},
       onboardingDone: false, userName: '', monthlyIncome: 0, budgetLimit: 0,
-      weekStart: 'monday', language: 'en'
+      weekStart: 'monday', language: 'en',
+      navTabs: ['dashboard', 'wallet', 'transactions', 'investments'],
+      accounts: []
     };
 
     // Destroy all chart instances to prevent leaks
@@ -2223,6 +2229,7 @@ function init() {
   updateGreeting();
   Chart.defaults.color = '#8a9dc0';
   Chart.defaults.font.family = "'DM Sans', sans-serif";
+  buildMobileNav();
   navigate('dashboard');
   applyLanguage();
   // Pre-populate settings fields with loaded state
@@ -2644,6 +2651,7 @@ function processSubscriptionCharges() {
 // FEATURE: Full Settings Page Render
 // ═══════════════════════════════════════════════════════════
 window.renderSettingsPage = function() {
+  if (window.renderNavSettings) window.renderNavSettings();
   var themeMode = state.themeMode || 'dark';
   var lang = state.language || 'en';
 
@@ -3252,4 +3260,97 @@ window.deleteAccount = function(id) {
   state.accounts = state.accounts.filter(function(a){ return a.id !== id; });
   save();
   window.renderWallet();
+};
+
+// ═══════════════════════════════════════════════════════════
+// FEATURE: Customisable Mobile Nav
+// ═══════════════════════════════════════════════════════════
+
+var ALL_NAV_PAGES = [
+  { id: 'dashboard',     label: 'Overview',      icon: '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 12l8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25"/></svg>' },
+  { id: 'wallet',        label: 'Wallet',         icon: '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M21 12a2.25 2.25 0 00-2.25-2.25H15a3 3 0 11-6 0H5.25A2.25 2.25 0 003 12m18 0v6a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 18v-6m18 0V9M3 12V9m18 0a2.25 2.25 0 00-2.25-2.25H5.25A2.25 2.25 0 003 9m18 0V6a2.25 2.25 0 00-2.25-2.25H5.25A2.25 2.25 0 003 6v3"/></svg>' },
+  { id: 'transactions',  label: 'Transactions',   icon: '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M7.5 21L3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5"/></svg>' },
+  { id: 'investments',   label: 'Invest',          icon: '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 18L9 11.25l4.306 4.307a11.95 11.95 0 015.814-5.519l2.74-1.22m0 0l-5.94-2.28m5.94 2.28l-2.28 5.941"/></svg>' },
+  { id: 'goals',         label: 'Goals',           icon: '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3 3v1.5M3 21v-6m0 0l2.77-.693a9 9 0 016.208.682l.108.054a9 9 0 006.086.71l3.114-.732a48.524 48.524 0 01-.005-10.499l-3.11.732a9 9 0 01-6.085-.711l-.108-.054a9 9 0 00-6.208-.682L3 4.5M3 15V4.5"/></svg>' },
+  { id: 'subscriptions', label: 'Subscriptions',   icon: '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99"/></svg>' },
+  { id: 'calendar',      label: 'Calendar',        icon: '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5"/></svg>' },
+  { id: 'analytics',     label: 'Analytics',       icon: '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z"/></svg>' },
+  { id: 'simulator',     label: 'Simulator',       icon: '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9.75 3.104v5.714a2.25 2.25 0 01-.659 1.591L5 14.5M9.75 3.104c-.251.023-.501.05-.75.082m.75-.082a24.301 24.301 0 014.5 0m0 0v5.714c0 .597.237 1.17.659 1.591L19.8 15.3M14.25 3.104c.251.023.501.05.75.082M19.8 15.3l-1.57.393A9.065 9.065 0 0112 15a9.065 9.065 0 00-6.23-.693L5 14.5m14.8.8l1.402 1.402c1.232 1.232.65 3.318-1.067 3.611A48.309 48.309 0 0112 21c-2.773 0-5.491-.235-8.135-.687-1.718-.293-2.3-2.379-1.067-3.61L5 14.5"/></svg>' },
+  { id: 'ai-advisor',    label: 'AI Advisor',      icon: '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z"/></svg>' },
+  { id: 'settings',      label: 'Settings',        icon: '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.431l-1.003.827c-.293.24-.438.613-.431.992a6.759 6.759 0 010 .255c-.007.378.138.75.43.99l1.005.828c.424.35.534.954.26 1.43l-1.298 2.247a1.125 1.125 0 01-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.57 6.57 0 01-.22.128c-.331.183-.581.495-.644.869l-.213 1.28c-.09.543-.56.941-1.11.941h-2.594c-.55 0-1.02-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 01-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.369-.49l-1.297-2.247a1.125 1.125 0 01.26-1.431l1.004-.827c.292-.24.437-.613.43-.992a6.932 6.932 0 010-.255c.007-.378-.138-.75-.43-.99l-1.004-.828a1.125 1.125 0 01-.26-1.43l1.297-2.247a1.125 1.125 0 011.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.087.22-.128.332-.183.582-.495.644-.869l.214-1.281z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>' },
+];
+
+function buildMobileNav() {
+  var tabs = (state.navTabs && state.navTabs.length === 4) ? state.navTabs : ['dashboard','wallet','transactions','investments'];
+  var nav = document.getElementById('mobile-nav');
+  if (!nav) return;
+
+  // Get current active page
+  var activePage = '';
+  document.querySelectorAll('.page.active').forEach(function(p) {
+    activePage = p.id.replace('page-', '');
+  });
+
+  var html = tabs.map(function(pageId) {
+    var page = ALL_NAV_PAGES.find(function(p){ return p.id === pageId; });
+    if (!page) return '';
+    var isActive = activePage === pageId;
+    return '<div class="mob-nav-item' + (isActive ? ' active' : '') + '" data-page="' + pageId + '">' +
+      page.icon + '<span>' + page.label + '</span></div>';
+  }).join('');
+
+  // Always add More button last
+  html += '<div class="mob-nav-item" onclick="openMoreSheet()">' +
+    '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5"/></svg>' +
+    '<span>More</span></div>';
+
+  nav.innerHTML = html;
+
+  // Re-attach click listeners
+  nav.querySelectorAll('.mob-nav-item[data-page]').forEach(function(el) {
+    el.addEventListener('click', function() { navigate(el.dataset.page); });
+  });
+}
+
+window.renderNavSettings = function() {
+  var tabs = state.navTabs || ['dashboard','wallet','transactions','investments'];
+  var el = document.getElementById('nav-customiser');
+  if (!el) return;
+
+  el.innerHTML = ALL_NAV_PAGES.map(function(page) {
+    var isSelected = tabs.indexOf(page.id) !== -1;
+    var idx = tabs.indexOf(page.id);
+    return '<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border)">' +
+      '<div style="display:flex;align-items:center;gap:10px">' +
+        '<div style="width:32px;height:32px;display:flex;align-items:center;justify-content:center;color:var(--text-muted)">' + page.icon + '</div>' +
+        '<span style="font-size:13.5px;font-weight:500">' + page.label + '</span>' +
+      '</div>' +
+      '<div style="display:flex;align-items:center;gap:8px">' +
+        (isSelected ? '<span style="font-size:11px;color:var(--text-muted)">Slot ' + (idx+1) + '</span>' : '') +
+        '<button onclick="toggleNavTab(\'' + page.id + '\')" class="btn btn-sm ' + (isSelected ? 'btn-danger' : 'btn-primary') + '" style="padding:4px 12px;font-size:11px">' +
+          (isSelected ? 'Remove' : 'Add') +
+        '</button>' +
+      '</div>' +
+    '</div>';
+  }).join('');
+
+  var countEl = document.getElementById('nav-slot-count');
+  if (countEl) countEl.textContent = tabs.length + '/4 slots used';
+};
+
+window.toggleNavTab = function(pageId) {
+  var tabs = state.navTabs ? state.navTabs.slice() : ['dashboard','wallet','transactions','investments'];
+  var idx = tabs.indexOf(pageId);
+  if (idx !== -1) {
+    if (tabs.length <= 1) { toast('Need at least 1 tab', 'error'); return; }
+    tabs.splice(idx, 1);
+  } else {
+    if (tabs.length >= 4) { toast('Max 4 tabs — remove one first', 'error'); return; }
+    tabs.push(pageId);
+  }
+  state.navTabs = tabs;
+  save();
+  buildMobileNav();
+  window.renderNavSettings();
+  toast('Navigation updated ✓', 'success');
 };
