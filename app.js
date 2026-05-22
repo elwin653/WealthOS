@@ -2830,17 +2830,7 @@ window.sendAiMessage = async function() {
   var text = (input.value || '').trim();
   if (!text) return;
 
-  var apiKey = state.geminiApiKey || '';
-  if (!apiKey) {
-    toast('Add your free Gemini API key in Settings first', 'error');
-    navigate('settings');
-    setTimeout(function() {
-      var el = document.getElementById('settings-gemini-key');
-      if (el) { el.focus(); el.scrollIntoView({behavior:'smooth'}); }
-    }, 400);
-    return;
-  }
-
+  // No API key needed — uses Pollinations AI (free, no signup)
   input.value = '';
   sendBtn.disabled = true;
   sendBtn.style.opacity = '0.5';
@@ -2857,39 +2847,31 @@ window.sendAiMessage = async function() {
       buildFinancialContext();
 
     // Try multiple model names in case one is unavailable
-    // OpenRouter free API — works globally, no credit card needed
-    // Free models: llama-3.1-8b, mistral-7b, gemma-2-9b etc.
-    var freeModels = [
-      'meta-llama/llama-3.2-3b-instruct:free',
-      'meta-llama/llama-3.1-8b-instruct:free',
-      'qwen/qwen-2.5-7b-instruct:free',
-      'mistralai/mistral-7b-instruct:free',
-      'microsoft/phi-3-mini-128k-instruct:free'
-    ];
-    var reply = null;
-    var lastErr = null;
+    // Pollinations AI — completely free, no API key, no signup needed
+    // Uses OpenAI-compatible endpoint with free models
+    reply = null;
+    lastErr = null;
 
-    for (var mi = 0; mi < freeModels.length; mi++) {
+    var pollinationsModels = ['openai', 'mistral', 'llama'];
+    for (var mi = 0; mi < pollinationsModels.length; mi++) {
       try {
-        var response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+        var response = await fetch('https://text.pollinations.ai/openai', {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer ' + apiKey,
-            'HTTP-Referer': window.location.href,
-            'X-Title': 'WealthOS AI Advisor'
-          },
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            model: freeModels[mi],
+            model: pollinationsModels[mi],
             messages: [
               { role: 'system', content: systemPrompt },
               ...aiHistory.map(function(m) {
-                return { role: m.role === 'model' ? 'assistant' : m.role,
-                         content: m.parts[0].text };
+                return {
+                  role: m.role === 'model' ? 'assistant' : m.role,
+                  content: m.parts[0].text
+                };
               })
             ],
             max_tokens: 800,
-            temperature: 0.7
+            temperature: 0.7,
+            private: true
           }),
           signal: AbortSignal.timeout(30000)
         });
@@ -2897,16 +2879,14 @@ window.sendAiMessage = async function() {
         if (!response.ok) {
           var errData = await response.json().catch(function(){ return {}; });
           lastErr = (errData.error && errData.error.message) || ('Error ' + response.status);
-          if (response.status === 401) throw new Error('Invalid API key. Check your key in Settings.');
-          continue; // try next model
+          continue;
         }
 
         var data = await response.json();
         reply = data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content;
         if (reply) break;
-      } catch(fetchErr) {
-        if (fetchErr.message && fetchErr.message.includes('Invalid API key')) throw fetchErr;
-        lastErr = fetchErr.message || 'Connection error';
+      } catch(e) {
+        lastErr = e.message || 'Connection error';
       }
     }
 
