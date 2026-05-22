@@ -356,10 +356,9 @@ function renderDashboard() {
   function fmtH(n) { return hide ? '••••' : fmt(n); }
 
   var thisMonthTxns = getThisMonthTxns();
-  var realIncomeTxns = thisMonthTxns.filter(function(t){ return t.type==='income' && t.desc!=='Opening Balance'; });
-  // Always add salary setting + income transactions (salary is fixed base, transactions are additional)
-  var txnIncome = getTotalIncome(realIncomeTxns);
-  var monthlyIncomeDisplay = (state.monthlyIncome || 0) + txnIncome;
+  // Monthly income card = fixed salary setting only
+  // Income transactions go into net worth/balance but don't change this card
+  var monthlyIncomeDisplay = state.monthlyIncome || 0;
   var monthlyExpenseDisplay = thisMonthTxns.filter(function(t){ return t.type==='expense'; }).reduce(function(s,t){ return s+t.amount; }, 0);
 
   // Hero card

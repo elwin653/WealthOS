@@ -1158,3 +1158,22 @@ td.td-mono { font-family: 'DM Mono', monospace; font-size: 13px; }
   #page-investments .data-table { border: none !important; background: transparent !important; }
   #page-investments .data-table td { border: none !important; }
 }
+
+/* ── Investments page mobile ─────────────────────── */
+.inv-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+}
+@media (max-width: 900px) {
+  .inv-stats-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+  .inv-table-desktop { display: none; }
+  #page-investments .card { padding: 0; background: transparent; border: none; box-shadow: none; }
+  #page-investments .page-header { padding-bottom: 0; }
+}
+@media (min-width: 901px) {
+  /* Desktop: show normal table */
+  #inv-table tr td[colspan="8"] { display: none; } /* hide mobile cards */
+}

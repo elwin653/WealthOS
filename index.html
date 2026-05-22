@@ -239,30 +239,28 @@
     <!-- ═══════════════════ INVESTMENTS ═══════════════════ -->
     <div class="page" id="page-investments">
       <div class="page-header">
-        <div style="display:flex;align-items:center;justify-content:space-between">
-          <div>
-            <div class="page-title">Investments</div>
-            <div class="page-sub">Track your portfolio in real-time</div>
-          </div>
-          <div style="display:flex;gap:8px;align-items:center">
-            <div id="price-refresh-status" style="font-size:11px;color:var(--text-muted)"></div>
-            <button class="btn btn-ghost" id="btn-refresh-prices" onclick="refreshAllPrices()">
-              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" style="width:14px;height:14px"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99"/></svg>
-              Refresh Prices
-            </button>
-            <button class="btn btn-primary" onclick="openModal('add-inv-modal')">
-              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" style="width:14px;height:14px"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/></svg>
-              Add Investment
-            </button>
-          </div>
+        <div>
+          <div class="page-title">Investments</div>
+          <div class="page-sub">Track your portfolio in real-time</div>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:8px">
+          <div id="price-refresh-status" style="font-size:11px;color:var(--text-muted);width:100%"></div>
+          <button class="btn btn-ghost btn-sm" id="btn-refresh-prices" onclick="refreshAllPrices()" style="flex:1">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" style="width:14px;height:14px"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99"/></svg>
+            Refresh Prices
+          </button>
+          <button class="btn btn-primary btn-sm" onclick="openModal('add-inv-modal')" style="flex:1">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" style="width:14px;height:14px"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/></svg>
+            Add Investment
+          </button>
         </div>
       </div>
 
-      <div class="grid-4" id="inv-stats"></div>
+      <div class="inv-stats-grid" id="inv-stats"></div>
 
-      <div class="card">
-        <div class="table-wrap">
-          <table>
+      <div class="card" style="overflow:hidden">
+        <div class="inv-table-desktop">
+          <table style="width:100%">
             <thead>
               <tr>
                 <th>Asset</th>
@@ -277,11 +275,11 @@
             </thead>
             <tbody id="inv-table"></tbody>
           </table>
-          <div id="inv-empty" class="empty-state" style="display:none">
-            <div class="empty-state-icon">📈</div>
-            <div class="empty-state-title">No investments yet</div>
-            <div class="empty-state-sub">Add your first investment to start tracking</div>
-          </div>
+        </div>
+        <div id="inv-empty" class="empty-state" style="display:none">
+          <div class="empty-state-icon">📈</div>
+          <div class="empty-state-title">No investments yet</div>
+          <div class="empty-state-sub">Add your first investment to start tracking</div>
         </div>
       </div>
     </div>
