@@ -307,13 +307,17 @@ function renderPage(page) {
 // ── Computed Values ──────────────────────────────────────
 // Convert an investment amount from its own currency to the user's display currency
 function convertToDisplayCurrency(amount, invCurrency) {
-  var userCurrency = state.currency || 'MYR';
-  if (!invCurrency || invCurrency === userCurrency) return amount;
-  // Convert via USD as the base
-  var invRate = fxRates[invCurrency] || 1;   // how many invCurrency per USD
-  var userRate = fxRates[userCurrency] || 1; // how many userCurrency per USD
-  var amountInUSD = amount / invRate;
-  return amountInUSD * userRate;
+  try {
+    if (!amount || isNaN(amount)) return 0;
+    var userCurrency = state.currency || 'MYR';
+    if (!invCurrency || invCurrency === userCurrency) return amount;
+    var rates = fxRates || {};
+    var invRate = rates[invCurrency] || 1;
+    var userRate = rates[userCurrency] || 1;
+    if (invRate === 0) return amount;
+    var amountInUSD = amount / invRate;
+    return amountInUSD * userRate;
+  } catch(e) { return amount; }
 }
 
 function getTotalInvested() {
@@ -379,6 +383,9 @@ function getSavingsRate() {
 
 // ── Dashboard ────────────────────────────────────────────
 function renderDashboard() {
+  try { _renderDashboard(); } catch(e) { console.error('Dashboard render error:', e); }
+}
+function _renderDashboard() {
   var nw = getNetWorth();
   var portVal = getTotalPortfolioValue();
   var pnl = getTotalPnL();
@@ -1725,16 +1732,34 @@ function confirmReset() {
       accounts: []
     };
 
-    // Destroy all chart instances to prevent leaks
+    // Destroy all chart instances
     if (typeof Chart !== 'undefined') {
       Object.values(Chart.instances || {}).forEach(function(c) { try { c.destroy(); } catch(e) {} });
     }
 
-    // Force a full page reload to make sure nothing stale remains
-    toast('All data cleared. Reloading...', 'info');
-    setTimeout(function() {
-      window.location.reload();
-    }, 800);
+    // Save clean empty state immediately (before any unload handlers can write old state)
+    try { localStorage.setItem('wealthos_v2', JSON.stringify(state)); } catch(e) {}
+
+    // Reset in-place — no reload needed, avoids unload handler race condition
+    applyTheme();
+    updateCurrencyLabels();
+    updateGreeting();
+    try { buildMobileNav(); } catch(e) {}
+    navigate('dashboard');
+
+    // Show onboarding overlay directly
+    var overlay = document.getElementById('onboarding-overlay');
+    if (overlay) overlay.style.display = 'flex';
+
+    // Clear form fields
+    var nameEl = document.getElementById('ob-name');
+    var incEl = document.getElementById('ob-income');
+    var curEl = document.getElementById('ob-currency');
+    if (nameEl) nameEl.value = '';
+    if (incEl) incEl.value = '';
+    if (curEl) curEl.value = 'MYR';
+
+    toast('All data cleared ✓', 'success');
   });
 }
 
