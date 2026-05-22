@@ -19,7 +19,7 @@ var CURRENCIES = {
   THB: { symbol: '฿',   name: 'Thai Baht' },
   IDR: { symbol: 'Rp',  name: 'Indonesian Rupiah' },
 };
-var fxRates = { USD: 1, MYR: 4.47, SGD: 1.34, EUR: 0.92, GBP: 0.79, JPY: 149.5, KRW: 1325, AUD: 1.53, CNY: 7.24, HKD: 7.82, THB: 35.1, IDR: 15800 };
+var fxRates = { USD: 1, MYR: 3.97, SGD: 1.34, EUR: 0.92, GBP: 0.79, JPY: 154.0, KRW: 1370, AUD: 1.56, CNY: 7.27, HKD: 7.79, THB: 34.8, IDR: 16300 }; // fallback — overwritten by live fetch
 var fxLastFetched = 0;
 var LANG = {
   en: { dashboard:'Overview', overview:'Overview', transactions:'Transactions', investments:'Investments', portfolio:'Portfolio', goals:'Goals', subscriptions:'Subscriptions', settings:'Settings', calendar:'Calendar', analytics:'Analytics', simulator:'Simulator', save:'Save', cancel:'Cancel', addExpense:'Add Expense', addIncome:'Add Income', dashboardSub:"Here's your financial overview", netWorth:'Net Worth', monthlyIncome:'Monthly Income', monthlySpend:'Monthly Spend', savingsRate:'Savings Rate', recentTxns:'Recent', netWorthTrend:'Net Worth Trend', spending:'Spending', insights:'Insights', profile:'Profile', appearance:'Appearance', language:'Language', currency:'Currency', theme:'Theme', dark:'Dark', light:'Light', system:'System', data:'Data', resetAll:'Reset All Data', exportData:'Export Backup', importData:'Import Backup', yourName:'Your Name', budgetLimit:'Monthly Budget Limit', saveProfile:'Save Profile', hideNumbers:'Hide Sensitive Numbers', total:'Total', amount:'Amount', date:'Date', description:'Description', category:'Category' },
@@ -297,12 +297,29 @@ function renderPage(page) {
 }
 
 // ── Computed Values ──────────────────────────────────────
+// Convert an investment amount from its own currency to the user's display currency
+function convertToDisplayCurrency(amount, invCurrency) {
+  var userCurrency = state.currency || 'MYR';
+  if (!invCurrency || invCurrency === userCurrency) return amount;
+  // Convert via USD as the base
+  var invRate = fxRates[invCurrency] || 1;   // how many invCurrency per USD
+  var userRate = fxRates[userCurrency] || 1; // how many userCurrency per USD
+  var amountInUSD = amount / invRate;
+  return amountInUSD * userRate;
+}
+
 function getTotalInvested() {
-  return state.investments.reduce((s, i) => s + (i.qty * i.buyPrice), 0);
+  return state.investments.reduce(function(s, i) {
+    var invCurr = i.invCurrency || state.currency;
+    return s + convertToDisplayCurrency(i.qty * i.buyPrice, invCurr);
+  }, 0);
 }
 
 function getTotalPortfolioValue() {
-  return state.investments.reduce((s, i) => s + (i.qty * i.currentPrice), 0);
+  return state.investments.reduce(function(s, i) {
+    var invCurr = i.invCurrency || state.currency;
+    return s + convertToDisplayCurrency(i.qty * i.currentPrice, invCurr);
+  }, 0);
 }
 
 function getTotalPnL() {
@@ -1829,10 +1846,20 @@ const CRYPTO_IDS = {
 
 // ── Price API helpers ─────────────────────────────────────
 
-const MYR_RATE = 4.47;
+// Get live USD->target currency rate from fxRates (fetched on startup)
+function getLiveRate(fromCurrency, toCurrency) {
+  if (fromCurrency === toCurrency) return 1;
+  var fromRate = fxRates[fromCurrency] || 1; // units of fromCurrency per USD
+  var toRate = fxRates[toCurrency] || 1;     // units of toCurrency per USD
+  return toRate / fromRate;
+}
 
 function toInvCurrency(usdPrice, invCurrency) {
-  return invCurrency === 'MYR' ? usdPrice * MYR_RATE : usdPrice;
+  // Convert USD price to the investment's own currency using live rate
+  if (invCurrency && invCurrency !== 'USD') {
+    return usdPrice * getLiveRate('USD', invCurrency);
+  }
+  return usdPrice;
 }
 
 // ── Stocks & ETFs: use Yahoo Finance via multiple reliable proxies ──
@@ -1849,7 +1876,7 @@ function parseYahooLive(text, invCurrency) {
     const price = result?.meta?.regularMarketPrice;
     const currency = result?.meta?.currency || 'USD';
     if (price && price > 0) {
-      if (currency === 'USD' && invCurrency === 'MYR') return price * MYR_RATE;
+      if (currency === 'USD' && invCurrency !== 'USD') return price * getLiveRate('USD', invCurrency);
       return price;
     }
   } catch(e) {}
@@ -1909,7 +1936,7 @@ async function fetchYahooHistorical(ticker, date, invCurrency) {
       if (closes?.length) {
         const validClose = [...closes].reverse().find(p => p != null && p > 0);
         if (validClose) {
-          if (currency === 'USD' && invCurrency === 'MYR') return validClose * MYR_RATE;
+          if (currency === 'USD' && invCurrency !== 'USD') return validClose * getLiveRate('USD', invCurrency);
           return validClose;
         }
       }
@@ -2636,6 +2663,14 @@ window.renderSettingsPage = function() {
   if (incomeEl) incomeEl.value = state.monthlyIncome || '';
   var budgetEl = document.getElementById('settings-budget');
   if (budgetEl) budgetEl.value = state.budgetLimit || '';
+
+  // Show live FX rate
+  var fxEl = document.getElementById('settings-fx-rate');
+  if (fxEl) {
+    var myrRate = fxRates['MYR'] || 3.97;
+    var ts = fxLastFetched ? new Date(fxLastFetched).toLocaleTimeString('en-MY',{hour:'2-digit',minute:'2-digit'}) : null;
+    fxEl.textContent = '1 USD = ' + myrRate.toFixed(4) + ' MYR' + (ts ? ' · Updated ' + ts : ' · Updating...');
+  }
 
   // Gemini key
   var keyEl = document.getElementById('settings-gemini-key');
