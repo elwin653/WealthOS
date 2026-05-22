@@ -141,6 +141,8 @@ function load() {
       if (!Array.isArray(state.investments)) state.investments = [];
       if (!Array.isArray(state.goals)) state.goals = [];
       if (!Array.isArray(state.subscriptions)) state.subscriptions = [];
+      if (!Array.isArray(state.navTabs) || state.navTabs.length === 0) state.navTabs = ['dashboard','wallet','transactions','investments'];
+      if (!Array.isArray(state.accounts)) state.accounts = [];
       if (!Array.isArray(state.networthHistory)) state.networthHistory = [];
       // If onboardingDone somehow missing but they have real data, restore it
       if (!state.onboardingDone && (state.transactions.length || state.investments.length)) {
@@ -262,8 +264,8 @@ function navigate(page) {
   document.getElementById('page-' + page)?.classList.add('active');
   document.querySelectorAll('[data-page="' + page + '"]').forEach(n => n.classList.add('active'));
   window.scrollTo(0, 0);
-  // Rebuild mobile nav to update active state on custom tabs
-  if (typeof buildMobileNav === 'function') buildMobileNav();
+  // Rebuild mobile nav — wrapped in try-catch so a crash never blocks navigation
+  try { if (typeof buildMobileNav === 'function') buildMobileNav(); } catch(e) { console.warn('Nav build error:', e); }
   renderPage(page);
 }
 
@@ -2229,7 +2231,7 @@ function init() {
   updateGreeting();
   Chart.defaults.color = '#8a9dc0';
   Chart.defaults.font.family = "'DM Sans', sans-serif";
-  buildMobileNav();
+  try { buildMobileNav(); } catch(e) {}
   navigate('dashboard');
   applyLanguage();
   // Pre-populate settings fields with loaded state
@@ -3281,7 +3283,8 @@ var ALL_NAV_PAGES = [
 ];
 
 function buildMobileNav() {
-  var tabs = (state.navTabs && state.navTabs.length === 4) ? state.navTabs : ['dashboard','wallet','transactions','investments'];
+  if (!Array.isArray(state.navTabs) || state.navTabs.length === 0) state.navTabs = ['dashboard','wallet','transactions','investments'];
+  var tabs = state.navTabs;
   var nav = document.getElementById('mobile-nav');
   if (!nav) return;
 
