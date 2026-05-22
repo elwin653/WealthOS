@@ -813,15 +813,11 @@ td.td-mono { font-family: 'DM Mono', monospace; font-size: 13px; }
   position: fixed;
   inset: 0;
   background: rgba(0, 0, 0, 0.5);
-  opacity: 0;
-  pointer-events: none;
   z-index: 250;
-  transition: opacity 0.25s;
-  -webkit-backdrop-filter: blur(2px);
-  backdrop-filter: blur(2px);
-  display: block !important;
+  display: none;
 }
 #more-sheet-overlay.open {
+  display: block;
   opacity: 1;
   pointer-events: auto;
 }
