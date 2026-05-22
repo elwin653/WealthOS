@@ -2860,9 +2860,11 @@ window.sendAiMessage = async function() {
     // OpenRouter free API — works globally, no credit card needed
     // Free models: llama-3.1-8b, mistral-7b, gemma-2-9b etc.
     var freeModels = [
+      'meta-llama/llama-3.2-3b-instruct:free',
       'meta-llama/llama-3.1-8b-instruct:free',
+      'qwen/qwen-2.5-7b-instruct:free',
       'mistralai/mistral-7b-instruct:free',
-      'google/gemma-2-9b-it:free'
+      'microsoft/phi-3-mini-128k-instruct:free'
     ];
     var reply = null;
     var lastErr = null;
