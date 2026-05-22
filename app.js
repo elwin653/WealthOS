@@ -2138,37 +2138,29 @@ window.checkOnboarding = function checkOnboarding() {
 
 window.closeOnboarding = function() {
   try {
-    const nameEl = document.getElementById('ob-name');
-    const incomeEl = document.getElementById('ob-income');
-    const cashEl = document.getElementById('ob-cash');
-    const currEl = document.getElementById('ob-currency');
-    const name = (nameEl && nameEl.value.trim()) || 'there';
-    const income = incomeEl ? (parseFloat(incomeEl.value) || 0) : 0;
-    const cash = cashEl ? (parseFloat(cashEl.value) || 0) : 0;
-    const currency = currEl ? currEl.value : 'MYR';
+    var name = (document.getElementById('ob-name').value.trim()) || 'there';
+    var income = parseFloat(document.getElementById('ob-income').value) || 0;
+    var currency = document.getElementById('ob-currency').value || 'MYR';
     state.currency = currency;
     state.onboardingDone = true;
     state.userName = name;
     state.monthlyIncome = income;
     if (!Array.isArray(state.transactions)) state.transactions = [];
-    if (cash > 0) {
-      state.transactions.push({ id: uid(), type: 'income', desc: 'Opening Balance', amount: cash, cat: 'Other', date: new Date().toISOString().slice(0,10) });
-    }
+    if (!Array.isArray(state.accounts)) state.accounts = [];
     save();
-    const overlay = document.getElementById('onboarding-overlay');
+    var overlay = document.getElementById('onboarding-overlay');
     if (overlay) overlay.style.display = 'none';
     updateCurrencyLabels();
     updateGreeting();
-    renderDashboard();
+    navigate('dashboard');
     toast('Welcome, ' + name + '! 🎉 Your WealthOS is ready.', 'success');
   } catch(e) {
     console.error('Onboarding error:', e);
-    // Force close even on error
-    const overlay = document.getElementById('onboarding-overlay');
+    var overlay = document.getElementById('onboarding-overlay');
     if (overlay) overlay.style.display = 'none';
     state.onboardingDone = true;
     save();
-    renderDashboard();
+    navigate('dashboard');
   }
 };
 
