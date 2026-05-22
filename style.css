@@ -988,3 +988,68 @@ td.td-mono { font-family: 'DM Mono', monospace; font-size: 13px; }
 /* Sidebar compact for shorter screens */
 #sidebar .nav-section { margin-bottom: 4px; }
 #sidebar .nav-item { padding: 8px 12px !important; }
+
+/* ═══════════════════════════════════════════════════════════
+   GLOBAL TYPOGRAPHY — consistent numbers across all pages
+   ═══════════════════════════════════════════════════════════ */
+
+/* Tabular numbers everywhere so digits don't jump */
+.stat-value, .mono, [class*="val"], [class*="amount"],
+.stat-card, .kpi-card, .inv-table td,
+#dash-networth-hero, #dash-income-val, #dash-expense-val,
+#dash-portfolio-hero, #dash-pnl-hero, #dash-savrate-hero {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+}
+
+/* Slightly bolder numbers throughout the app */
+.stat-value {
+  font-weight: 650 !important;
+  letter-spacing: -0.2px;
+}
+
+/* Page titles — a touch thicker */
+.page-title {
+  font-weight: 750 !important;
+}
+
+/* Chart labels — consistent */
+.chart-label {
+  font-weight: 650 !important;
+  font-size: 12px !important;
+  letter-spacing: 0.02em;
+}
+
+/* Transaction amounts */
+.txn-amount, [class*="txn"] b, [class*="txn"] strong {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+  font-weight: 650;
+}
+
+/* Investment table numbers */
+.inv-table td:nth-child(4),
+.inv-table td:nth-child(5),
+.inv-table td:nth-child(6),
+.inv-table td:nth-child(7) {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+}
+
+/* KPI cards on all pages */
+.kpi-card .kpi-val, .kpi-value {
+  font-variant-numeric: tabular-nums;
+  font-weight: 650;
+  letter-spacing: -0.2px;
+}
+
+/* Badge numbers */
+.badge {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Goal progress numbers */
+.goal-progress-text {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}

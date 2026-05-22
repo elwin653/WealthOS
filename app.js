@@ -2830,12 +2830,14 @@ window.sendAiMessage = async function() {
       buildFinancialContext();
 
     // Try multiple model names in case one is unavailable
-    var models = ['gemini-2.0-flash', 'gemini-2.0-flash-lite', 'gemini-1.5-flash'];
+    var models = ['gemini-2.0-flash-exp', 'gemini-1.5-flash-latest', 'gemini-1.5-pro-latest', 'gemini-pro'];
     var reply = null;
     var lastErr = null;
 
     for (var mi = 0; mi < models.length; mi++) {
-      var url = 'https://generativelanguage.googleapis.com/v1beta/models/' + models[mi] + ':generateContent?key=' + apiKey;
+      // Try v1beta first, fall back to v1 if needed
+      var baseUrl = 'https://generativelanguage.googleapis.com/v1beta/models/';
+      var url = baseUrl + models[mi] + ':generateContent?key=' + apiKey;
       // Build contents: inject system prompt into first user turn only
       var contents = [];
       for (var hi = 0; hi < aiHistory.length; hi++) {
