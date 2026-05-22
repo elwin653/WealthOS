@@ -2539,7 +2539,7 @@ window.saveGeminiKey = function() {
   var keyEl = document.getElementById('settings-gemini-key');
   var key = keyEl ? keyEl.value.trim() : '';
   if (!key) { toast('Please paste your API key first', 'error'); return; }
-  if (!key.startsWith('sk-or-')) { toast('Invalid key — OpenRouter keys start with sk-or-', 'error'); return; }
+  if (key.length < 20) { toast('Key looks too short — paste the full key from openrouter.ai', 'error'); return; }
   state.geminiApiKey = key;
   save();
   window.renderSettingsPage();

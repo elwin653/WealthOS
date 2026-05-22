@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500;1,300&family=Syne:wght@400;500;600;700;800&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,300&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Orbitron:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap');
 
 :root {
   --bg-base: #080c14;
@@ -1053,3 +1053,30 @@ td.td-mono { font-family: 'Space Mono', monospace; font-size: 13px; }
   font-variant-numeric: tabular-nums;
   font-weight: 600;
 }
+
+
+/* ── ORBITRON: Futuristic number font ─────────────────── */
+#dash-networth-hero,
+#dash-income-val,
+#dash-expense-val,
+#dash-portfolio-hero,
+#dash-pnl-hero,
+#dash-savrate-hero,
+.stat-value,
+.mono,
+.kpi-val,
+.kpi-value,
+.inv-price,
+.pnl-val,
+[class*="-val"]:not(button):not(input),
+[class*="-value"]:not(button):not(input) {
+  font-family: 'Orbitron', 'Space Mono', monospace !important;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Slightly smaller for Orbitron since it's wide */
+#dash-networth-hero { font-size: 26px !important; }
+#dash-income-val, #dash-expense-val { font-size: 16px !important; }
+#dash-portfolio-hero, #dash-pnl-hero, #dash-savrate-hero { font-size: 12px !important; }
