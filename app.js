@@ -2798,30 +2798,22 @@ function buildFinancialContext() {
   // Savings rate
   var savRate = (mInc > 0) ? Math.round(((mInc - mExp) / mInc) * 100) : 0;
 
-  return 'USER FINANCIAL DATA (as of ' + new Date().toLocaleDateString() + '):\n' +
-    'Name: ' + (state.userName || 'User') + '\n' +
-    'Currency: ' + state.currency + '\n' +
-    'Net Worth: ' + sym + (getNetWorth()).toLocaleString('en-US', {maximumFractionDigits:2}) + '\n' +
-    '\nTHIS MONTH (' + thisMonth + '):\n' +
-    '- Income: ' + sym + mInc.toLocaleString('en-US', {maximumFractionDigits:2}) + '\n' +
-    '- Expenses: ' + sym + mExp.toLocaleString('en-US', {maximumFractionDigits:2}) + '\n' +
-    '- Net: ' + sym + (mInc - mExp).toLocaleString('en-US', {maximumFractionDigits:2}) + '\n' +
-    '- Savings Rate: ' + savRate + '%\n' +
-    '- Expense Breakdown: ' + (catBreakdown || 'None') + '\n' +
-    '\nALL TIME:\n' +
-    '- Total Income: ' + sym + totalInc.toLocaleString('en-US', {maximumFractionDigits:2}) + '\n' +
-    '- Total Expenses: ' + sym + totalExp.toLocaleString('en-US', {maximumFractionDigits:2}) + '\n' +
-    '\nINVESTMENTS:\n' +
-    '- Portfolio Value: ' + sym + totalPortfolio.toLocaleString('en-US', {maximumFractionDigits:2}) + '\n' +
-    '- Total Invested: ' + sym + totalInvested.toLocaleString('en-US', {maximumFractionDigits:2}) + '\n' +
-    '- P&L: ' + (pnl >= 0 ? '+' : '') + sym + pnl.toLocaleString('en-US', {maximumFractionDigits:2}) + '\n' +
-    '- Holdings: ' + (state.investments.map(function(i){ return i.name; }).join(', ') || 'None') + '\n' +
-    '\nGOALS: ' + goalsStr + '\n' +
-    '\nSUBSCRIPTIONS: ' + subsStr + '\n' +
-    '\nRECENT TRANSACTIONS (last 10):\n' +
-    txns.slice(0,10).map(function(t) {
-      return '- ' + t.date + ' | ' + t.type + ' | ' + t.desc + ' | ' + sym + t.amount.toFixed(2) + ' | ' + t.cat;
-    }).join('\n');
+  // Keep context concise to avoid Groq token limits
+  return 'FINANCIAL SNAPSHOT (' + new Date().toLocaleDateString() + ')\n' +
+    'User: ' + (state.userName || 'User') + ' | Currency: ' + state.currency + '\n' +
+    'Net Worth: ' + sym + getNetWorth().toLocaleString('en-US',{maximumFractionDigits:0}) + '\n' +
+    'This Month: Income ' + sym + mInc.toLocaleString('en-US',{maximumFractionDigits:0}) +
+      ' | Expenses ' + sym + mExp.toLocaleString('en-US',{maximumFractionDigits:0}) +
+      ' | Savings Rate ' + savRate + '%\n' +
+    'Spending by category: ' + (catBreakdown || 'None') + '\n' +
+    'Investments: Portfolio ' + sym + totalPortfolio.toLocaleString('en-US',{maximumFractionDigits:0}) +
+      ' | P&L ' + (pnl>=0?'+':'') + sym + pnl.toLocaleString('en-US',{maximumFractionDigits:0}) +
+      ' | Holdings: ' + (state.investments.map(function(i){return i.name;}).join(', ')||'None') + '\n' +
+    'Goals: ' + goalsStr + '\n' +
+    'Subscriptions: ' + subsStr + '\n' +
+    'Recent transactions: ' + txns.slice(0,5).map(function(t){
+      return t.date+' '+t.type+' '+t.desc+' '+sym+t.amount.toFixed(0)+' ('+t.cat+')';
+    }).join('; ');
 }
 
 function appendAiMessage(role, text, isStreaming) {
@@ -2888,7 +2880,7 @@ window.sendAiMessage = async function() {
       throw new Error('Add your free Groq API key in Settings → AI Advisor first');
     }
 
-    var groqModels = ['llama-3.1-8b-instant', 'mixtral-8x7b-32768', 'gemma2-9b-it'];
+    var groqModels = ['llama3-8b-8192', 'llama3-groq-8b-8192-tool-use-preview', 'llama-3.1-8b-instant', 'gemma2-9b-it', 'mixtral-8x7b-32768'];
     var messages = [{ role: 'system', content: systemPrompt }];
     aiHistory.forEach(function(m) {
       messages.push({
