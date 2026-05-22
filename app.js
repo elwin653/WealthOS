@@ -174,9 +174,11 @@ function fmtFull(n) {
 
 // Format with a specific investment's own currency
 function fmtInv(n, invCurrency, decimals) {
-  const sym = CURR_SYMBOL[invCurrency] || invCurrency || curr();
-  const abs = Math.abs(n);
-  const dec = decimals !== undefined ? decimals : (abs < 1 ? 4 : 2);
+  // Get symbol: check CURRENCIES map first, then CURR_SYMBOL, then fallback
+  var sym = (CURRENCIES && CURRENCIES[invCurrency] && CURRENCIES[invCurrency].symbol)
+    || CURR_SYMBOL[invCurrency] || invCurrency || curr();
+  var abs = Math.abs(n);
+  var dec = decimals !== undefined ? decimals : (abs < 1 ? 4 : 2);
   return sym + abs.toLocaleString('en-MY', { minimumFractionDigits: dec, maximumFractionDigits: dec });
 }
 
@@ -1348,7 +1350,21 @@ async function invFetchPrice() {
   if (!ticker) { toast('Enter a ticker symbol first', 'error'); return; }
   if (!dateEl.value) { toast('Set your purchase date first', 'error'); return; }
 
-  const invCurr = currEl.value || state.currency;
+  // Auto-detect currency from ticker
+  var autoCurr;
+  if (ticker.endsWith('.KL')) {
+    autoCurr = 'MYR'; // Bursa Malaysia stocks
+  } else {
+    autoCurr = 'USD'; // All crypto, US stocks, ETFs, commodities = USD
+  }
+  currEl.value = autoCurr;
+  var dispEl = document.getElementById('inv-currency-display');
+  if (dispEl) {
+    var flagMap = { USD: '🇺🇸 USD — price stored in US Dollars', MYR: '🇲🇾 MYR — price stored in Ringgit' };
+    dispEl.textContent = flagMap[autoCurr] || autoCurr;
+  }
+
+  const invCurr = autoCurr;
   const purchaseDate = dateEl.value;
 
   // Auto-detect type from ticker
@@ -1500,7 +1516,13 @@ function editInvestment(id) {
   document.getElementById('inv-name').value = i.name;
   document.getElementById('inv-name').setAttribute('readonly', 'readonly'); // ticker shouldn't change on edit
   document.getElementById('inv-type').value = i.type;
-  document.getElementById('inv-currency').value = i.invCurrency || state.currency;
+  var ec = i.invCurrency || 'USD';
+  document.getElementById('inv-currency').value = ec;
+  var ed = document.getElementById('inv-currency-display');
+  if (ed) {
+    var flagMap = { USD: '🇺🇸 USD — price stored in US Dollars', MYR: '🇲🇾 MYR — price stored in Ringgit' };
+    ed.textContent = flagMap[ec] || ec;
+  }
   document.getElementById('inv-qty').value = i.qty;
   document.getElementById('inv-buy').value = i.buyPrice ? i.buyPrice.toFixed(i.buyPrice < 1 ? 6 : 2) : '';
   document.getElementById('inv-date').value = i.date || '';
@@ -1715,7 +1737,9 @@ function resetInvModal() {
   document.getElementById('inv-name').value = '';
   document.getElementById('inv-name').removeAttribute('readonly');
   document.getElementById('inv-type').value = 'stock';
-  document.getElementById('inv-currency').value = state.currency;
+  document.getElementById('inv-currency').value = 'USD';
+  var d = document.getElementById('inv-currency-display');
+  if (d) d.textContent = 'Auto-detected from ticker';
   document.getElementById('inv-qty').value = '';
   document.getElementById('inv-buy').value = '';
   document.getElementById('inv-date').value = new Date().toISOString().slice(0,10);
