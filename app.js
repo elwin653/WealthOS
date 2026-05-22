@@ -790,27 +790,59 @@ function renderTransactions() {
     empty.style.display = 'block';
   } else {
     empty.style.display = 'none';
-    tbody.innerHTML = txns.map(t => `
-      <tr>
-        <td class="td-mono" style="font-size:12px">${formatDate(t.date)}</td>
-        <td class="td-primary">${t.desc}</td>
-        <td><span class="badge" style="background:${CAT_COLORS[t.cat]}22;color:${CAT_COLORS[t.cat]};border:1px solid ${CAT_COLORS[t.cat]}44">${CAT_ICONS[t.cat]||'📋'} ${t.cat}</span></td>
-        <td><span class="badge ${t.type==='income'?'badge-green':'badge-red'}">${t.type}</span></td>
-        <td class="td-mono td-primary" style="color:${t.type==='income'?'var(--green)':'var(--red)'}">
-          ${t.type==='income'?'+':'−'}${fmtFull(t.amount)}
-        </td>
-        <td>
-          <div style="display:flex;gap:4px">
-            <button class="btn btn-ghost btn-sm btn-icon" onclick="editTransaction('${t.id}')">
-              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" style="width:13px;height:13px"><path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931z"/></svg>
-            </button>
-            <button class="btn btn-danger btn-sm btn-icon" onclick="deleteTransaction('${t.id}')">
-              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" style="width:13px;height:13px"><path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"/></svg>
-            </button>
-          </div>
-        </td>
-      </tr>
-    `).join('');
+    const isMobile = window.innerWidth <= 900;
+    if (isMobile) {
+      // Mobile: card-based list, no table
+      tbody.innerHTML = txns.map(t => {
+        const color = t.type === 'income' ? 'var(--green)' : 'var(--red)';
+        const bg = t.type === 'income' ? 'rgba(52,211,153,0.12)' : 'rgba(248,113,113,0.12)';
+        const icon = CAT_ICONS[t.cat] || (t.type === 'income' ? '💰' : '💸');
+        const sign = t.type === 'income' ? '+' : '−';
+        const d = new Date(t.date + 'T00:00:00');
+        const dateStr = d.toLocaleDateString('en-MY', {day:'numeric', month:'short', year:'numeric'});
+        return '<tr><td colspan="6" style="padding:0;border:none"><div style="display:flex;align-items:center;justify-content:space-between;padding:12px 4px;border-bottom:1px solid var(--border)">' +
+          '<div style="display:flex;align-items:center;gap:12px;flex:1;min-width:0">' +
+            '<div style="width:40px;height:40px;border-radius:12px;background:' + bg + ';display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0">' + icon + '</div>' +
+            '<div style="min-width:0">' +
+              '<div style="font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + t.desc + '</div>' +
+              '<div style="font-size:11px;color:var(--text-muted);margin-top:2px">' + t.cat + ' · ' + dateStr + '</div>' +
+            '</div>' +
+          '</div>' +
+          '<div style="display:flex;align-items:center;gap:10px;flex-shrink:0;margin-left:12px">' +
+            '<div style="font-size:14px;font-weight:700;color:' + color + '">' + sign + fmtFull(t.amount) + '</div>' +
+            '<button class="btn btn-ghost btn-sm btn-icon" onclick="editTransaction(\'' + t.id + '\')" style="padding:6px">' +
+              '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" style="width:14px;height:14px"><path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931z"/></svg>' +
+            '</button>' +
+            '<button class="btn btn-danger btn-sm btn-icon" onclick="deleteTransaction(\'' + t.id + '\')" style="padding:6px">' +
+              '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" style="width:14px;height:14px"><path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"/></svg>' +
+            '</button>' +
+          '</div>' +
+        '</div></td></tr>';
+      }).join('');
+    } else {
+      // Desktop: full table
+      tbody.innerHTML = txns.map(t => `
+        <tr>
+          <td class="td-mono" style="font-size:12px">${formatDate(t.date)}</td>
+          <td class="td-primary">${t.desc}</td>
+          <td><span class="badge" style="background:${CAT_COLORS[t.cat]}22;color:${CAT_COLORS[t.cat]};border:1px solid ${CAT_COLORS[t.cat]}44">${CAT_ICONS[t.cat]||'📋'} ${t.cat}</span></td>
+          <td><span class="badge ${t.type==='income'?'badge-green':'badge-red'}">${t.type}</span></td>
+          <td class="td-mono td-primary" style="color:${t.type==='income'?'var(--green)':'var(--red)'}">
+            ${t.type==='income'?'+':'−'}${fmtFull(t.amount)}
+          </td>
+          <td>
+            <div style="display:flex;gap:4px">
+              <button class="btn btn-ghost btn-sm btn-icon" onclick="editTransaction('${t.id}')">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" style="width:13px;height:13px"><path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931z"/></svg>
+              </button>
+              <button class="btn btn-danger btn-sm btn-icon" onclick="deleteTransaction('${t.id}')">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" style="width:13px;height:13px"><path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"/></svg>
+              </button>
+            </div>
+          </td>
+        </tr>
+      `).join('');
+    }
   }
   renderCashflowChart();
 }
@@ -2849,8 +2881,8 @@ window.sendAiMessage = async function() {
     // Try multiple model names in case one is unavailable
     // Pollinations AI — completely free, no API key, no signup needed
     // Uses OpenAI-compatible endpoint with free models
-    reply = null;
-    lastErr = null;
+    var reply = null;
+    var lastErr = null;
 
     var pollinationsModels = ['openai', 'mistral', 'llama'];
     for (var mi = 0; mi < pollinationsModels.length; mi++) {

@@ -1106,3 +1106,10 @@ td.td-mono { font-family: 'DM Mono', monospace; font-size: 13px; }
 #dash-networth-hero { font-size: 30px !important; font-weight: 700 !important; }
 #dash-income-val, #dash-expense-val { font-size: 20px !important; }
 #dash-portfolio-hero, #dash-pnl-hero, #dash-savrate-hero { font-size: 14px !important; }
+/* ── Transactions: hide table header on mobile ─── */
+@media (max-width: 900px) {
+  .txn-table-header { display: none !important; }
+  #page-transactions .data-table thead { display: none !important; }
+  #page-transactions .data-table { border: none !important; background: transparent !important; }
+  #page-transactions .data-table td { border: none !important; }
+}
