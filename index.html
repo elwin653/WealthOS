@@ -1,0 +1,1151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#080c14" />
+  <meta name="description" content="WealthOS — Personal Wealth & Investment Management" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <title>WealthOS</title>
+  <link rel="manifest" href="manifest.json" />
+  <link rel="stylesheet" href="style.css" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+</head>
+<body>
+
+<!-- Toast Container -->
+<div id="toast-container"></div>
+
+<!-- Mobile Header -->
+<div id="mobile-header">
+  <div style="display:flex;align-items:center;gap:10px">
+    <div class="logo-mark" style="width:30px;height:30px;font-size:13px;margin-bottom:0">W</div>
+    <span style="font-family:'Syne',sans-serif;font-weight:700;font-size:15px">WealthOS</span>
+  </div>
+  <div style="display:flex;gap:8px">
+    <button class="btn btn-ghost btn-sm btn-icon" onclick="openModal('add-txn-modal')" title="Add Transaction">
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" style="width:16px;height:16px"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/></svg>
+    </button>
+  </div>
+</div>
+
+<!-- Mobile Bottom Nav -->
+<div id="mobile-nav">
+  <div class="mob-nav-item active" data-page="dashboard">
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 12l8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25"/></svg>
+    <span data-i18n="overview">Home</span>
+  </div>
+  <div class="mob-nav-item" data-page="transactions">
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M7.5 21L3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5"/></svg>
+    <span data-i18n="transactions">Transactions</span>
+  </div>
+  <div class="mob-nav-item" data-page="calendar">
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5"/></svg>
+    <span data-i18n="calendar">Calendar</span>
+  </div>
+  <div class="mob-nav-item" data-page="investments">
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 18L9 11.25l4.306 4.307a11.95 11.95 0 015.814-5.519l2.74-1.22m0 0l-5.94-2.28m5.94 2.28l-2.28 5.941"/></svg>
+    <span data-i18n="investments">Invest</span>
+  </div>
+  <div class="mob-nav-item" onclick="openMoreSheet()">
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5"/></svg>
+    <span>More</span>
+  </div>
+</div>
+
+<!-- More Bottom Sheet -->
+<div id="more-sheet-overlay" onclick="closeMoreSheet()"></div>
+<div id="more-sheet">
+  <div style="display:flex;justify-content:center;padding:8px 0 4px">
+    <div style="width:36px;height:4px;background:var(--border);border-radius:99px"></div>
+  </div>
+  <div style="padding:16px 20px 28px">
+    <div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:14px">More Options</div>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px">
+      <button class="more-sheet-btn" onclick="navigateFromMore('goals')">
+        <div style="font-size:24px">🎯</div>
+        <div data-i18n="goals">Goals</div>
+      </button>
+      <button class="more-sheet-btn" onclick="navigateFromMore('subscriptions')">
+        <div style="font-size:24px">🔄</div>
+        <div data-i18n="subscriptions">Subscriptions</div>
+      </button>
+      <button class="more-sheet-btn" onclick="navigateFromMore('analytics')">
+        <div style="font-size:24px">📊</div>
+        <div data-i18n="analytics">Analytics</div>
+      </button>
+      <button class="more-sheet-btn" onclick="navigateFromMore('simulator')">
+        <div style="font-size:24px">📈</div>
+        <div data-i18n="simulator">Simulator</div>
+      </button>
+      <button class="more-sheet-btn" onclick="navigateFromMore('portfolio')">
+        <div style="font-size:24px">💼</div>
+        <div data-i18n="portfolio">Portfolio</div>
+      </button>
+      <button class="more-sheet-btn" onclick="navigateFromMore('settings')">
+        <div style="font-size:24px">⚙️</div>
+        <div data-i18n="settings">Settings</div>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- App Layout -->
+<div id="app">
+
+  <!-- Sidebar -->
+  <nav id="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-mark">W</div>
+      <div class="logo-name">WealthOS</div>
+      <div class="logo-sub">Finance Manager</div>
+    </div>
+
+    <div class="nav-section">
+      <div class="nav-item active" data-page="dashboard">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z"/></svg>
+        Dashboard
+      </div>
+      <div class="nav-item" data-page="transactions">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M7.5 21L3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5"/></svg>
+        Transactions
+      </div>
+      <div class="nav-item" data-page="investments">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 18L9 11.25l4.306 4.307a11.95 11.95 0 015.814-5.519l2.74-1.22m0 0l-5.94-2.28m5.94 2.28l-2.28 5.941"/></svg>
+        Investments
+      </div>
+      <div class="nav-item" data-page="goals">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3 3v1.5M3 21v-6m0 0l2.77-.693a9 9 0 016.208.682l.108.054a9 9 0 006.086.71l3.114-.732a48.524 48.524 0 01-.005-10.499l-3.11.732a9 9 0 01-6.085-.711l-.108-.054a9 9 0 00-6.208-.682L3 4.5M3 15V4.5"/></svg>
+        Goals
+      </div>
+      <div class="nav-item" data-page="subscriptions">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99"/></svg>
+        Subscriptions
+      </div>
+      <div class="nav-item" data-page="simulator">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9.75 3.104v5.714a2.25 2.25 0 01-.659 1.591L5 14.5M9.75 3.104c-.251.023-.501.05-.75.082m.75-.082a24.301 24.301 0 014.5 0m0 0v5.714c0 .597.237 1.17.659 1.591L19.8 15.3M14.25 3.104c.251.023.501.05.75.082M19.8 15.3l-1.57.393A9.065 9.065 0 0112 15a9.065 9.065 0 00-6.23-.693L5 14.5m14.8.8l1.402 1.402c1.232 1.232.65 3.318-1.067 3.611A48.309 48.309 0 0112 21c-2.773 0-5.491-.235-8.135-.687-1.718-.293-2.3-2.379-1.067-3.61L5 14.5"/></svg>
+        Simulator
+      </div>
+      <div class="nav-item" data-page="calendar">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5"/></svg>
+        Calendar
+      </div>
+      <div class="nav-item" data-page="ai-advisor" style="color:var(--blue)">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456zM16.894 20.567L16.5 21.75l-.394-1.183a2.25 2.25 0 00-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 001.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 001.423 1.423l1.183.394-1.183.394a2.25 2.25 0 00-1.423 1.423z"/></svg>
+        AI Advisor
+      </div>
+      <div class="nav-item" data-page="settings">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.431l-1.003.827c-.293.24-.438.613-.431.992a6.759 6.759 0 010 .255c-.007.378.138.75.43.99l1.005.828c.424.35.534.954.26 1.43l-1.298 2.247a1.125 1.125 0 01-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.57 6.57 0 01-.22.128c-.331.183-.581.495-.644.869l-.213 1.28c-.09.543-.56.941-1.11.941h-2.594c-.55 0-1.02-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 01-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.369-.49l-1.297-2.247a1.125 1.125 0 01.26-1.431l1.004-.827c.292-.24.437-.613.43-.992a6.932 6.932 0 010-.255c.007-.378-.138-.75-.43-.99l-1.004-.828a1.125 1.125 0 01-.26-1.43l1.297-2.247a1.125 1.125 0 011.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.087.22-.128.332-.183.582-.495.644-.869l.214-1.281z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+        Settings
+      </div>
+    </div>
+  </nav>
+
+  <!-- Main Content -->
+  <main id="main">
+
+    <!-- ═══════════════════ DASHBOARD ═══════════════════ -->
+    <div class="page active" id="page-dashboard">
+      <!-- Professional Dashboard Header -->
+      <div style="padding:20px 20px 0;display:flex;align-items:center;justify-content:space-between">
+        <div>
+          <div data-i18n="overview" style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:2px">Financial Overview</div>
+          <div style="font-size:22px;font-weight:800;color:var(--text-primary);font-family:'Syne',sans-serif" id="dash-title">Overview</div>
+        </div>
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-sm" onclick="quickAddIncome()" style="border-radius:10px;background:rgba(0,245,160,0.12);border:1px solid rgba(0,245,160,0.3);color:var(--green);font-weight:700;gap:5px;padding:7px 12px">
+            + Income
+          </button>
+          <button class="btn btn-sm" onclick="quickAddExpense()" style="border-radius:10px;background:rgba(255,77,109,0.12);border:1px solid rgba(255,77,109,0.3);color:var(--red);font-weight:700;gap:5px;padding:7px 12px">
+            − Expense
+          </button>
+        </div>
+      </div>
+
+      <!-- Net Worth Hero Card -->
+      <div style="margin:16px 20px 0;background:linear-gradient(135deg,var(--bg-card) 0%,var(--bg-elevated) 100%);border:1px solid var(--border);border-radius:18px;padding:22px;position:relative;overflow:hidden">
+        <div style="position:absolute;top:-20px;right:-20px;width:120px;height:120px;background:radial-gradient(circle,rgba(77,159,255,0.08),transparent);border-radius:50%"></div>
+        <div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:6px" data-i18n="netWorth">Total Net Worth</div>
+        <div id="dash-networth-hero" style="font-size:32px;font-weight:800;font-family:'Syne',sans-serif;color:var(--text-primary);margin-bottom:12px">—</div>
+        <div style="display:flex;gap:20px;flex-wrap:wrap">
+          <div>
+            <div style="font-size:10px;color:var(--text-muted);margin-bottom:2px">Portfolio</div>
+            <div id="dash-portfolio-hero" style="font-size:13px;font-weight:700;color:var(--blue)">—</div>
+          </div>
+          <div>
+            <div style="font-size:10px;color:var(--text-muted);margin-bottom:2px">P&amp;L</div>
+            <div id="dash-pnl-hero" style="font-size:13px;font-weight:700">—</div>
+          </div>
+          <div>
+            <div style="font-size:10px;color:var(--text-muted);margin-bottom:2px" data-i18n="savingsRate">Savings Rate</div>
+            <div id="dash-savrate-hero" style="font-size:13px;font-weight:700;color:var(--green)">—</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Stat Cards Row -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:12px 20px 0">
+        <div id="dash-income-card" style="background:var(--bg-card);border:1px solid var(--border);border-radius:14px;padding:16px">
+          <div style="font-size:10px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px" data-i18n="monthlyIncome">Monthly Income</div>
+          <div id="dash-income-val" style="font-size:18px;font-weight:800;color:var(--green);font-family:'Syne',sans-serif">—</div>
+        </div>
+        <div id="dash-expense-card" style="background:var(--bg-card);border:1px solid var(--border);border-radius:14px;padding:16px">
+          <div style="font-size:10px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px" data-i18n="monthlySpend">Monthly Spend</div>
+          <div id="dash-expense-val" style="font-size:18px;font-weight:800;color:var(--red);font-family:'Syne',sans-serif">—</div>
+        </div>
+      </div>
+
+      <!-- Charts -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:12px 20px 0">
+        <div class="card" style="margin:0">
+          <div class="chart-label" style="font-size:11px" data-i18n="netWorthTrend">Net Worth Trend</div>
+          <div class="chart-wrap" style="height:160px"><canvas id="chart-networth"></canvas></div>
+        </div>
+        <div class="card" style="margin:0">
+          <div class="chart-label" style="font-size:11px" data-i18n="spending">Spending</div>
+          <div class="chart-wrap" style="height:160px"><canvas id="chart-expense-donut"></canvas></div>
+        </div>
+      </div>
+
+      <!-- Recent Transactions + Insights -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:12px 20px 20px">
+        <div class="card" style="margin:0">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+            <div class="chart-label" style="margin-bottom:0;font-size:11px" data-i18n="recentTxns">Recent</div>
+            <span class="badge badge-blue" style="cursor:pointer;font-size:10px" onclick="navigate('transactions')">All</span>
+          </div>
+          <div id="dash-txn-list"></div>
+        </div>
+        <div class="card" style="margin:0">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+            <div class="chart-label" style="margin-bottom:0;font-size:11px" data-i18n="insights">Insights</div>
+            <span class="badge badge-green" style="font-size:10px">AI</span>
+          </div>
+          <div id="dash-insights"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════ INVESTMENTS ═══════════════════ -->
+    <div class="page" id="page-investments">
+      <div class="page-header">
+        <div style="display:flex;align-items:center;justify-content:space-between">
+          <div>
+            <div class="page-title">Investments</div>
+            <div class="page-sub">Track your portfolio in real-time</div>
+          </div>
+          <div style="display:flex;gap:8px;align-items:center">
+            <div id="price-refresh-status" style="font-size:11px;color:var(--text-muted)"></div>
+            <button class="btn btn-ghost" id="btn-refresh-prices" onclick="refreshAllPrices()">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" style="width:14px;height:14px"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99"/></svg>
+              Refresh Prices
+            </button>
+            <button class="btn btn-primary" onclick="openModal('add-inv-modal')">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" style="width:14px;height:14px"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/></svg>
+              Add Investment
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid-4" id="inv-stats"></div>
+
+      <div class="card">
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Asset</th>
+                <th>Type</th>
+                <th>Qty</th>
+                <th>Buy Price</th>
+                <th>Current Price</th>
+                <th>Value</th>
+                <th>P&amp;L</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="inv-table"></tbody>
+          </table>
+          <div id="inv-empty" class="empty-state" style="display:none">
+            <div class="empty-state-icon">📈</div>
+            <div class="empty-state-title">No investments yet</div>
+            <div class="empty-state-sub">Add your first investment to start tracking</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════ PORTFOLIO ═══════════════════ -->
+    <div class="page" id="page-portfolio">
+      <div class="page-header">
+        <div class="page-title">Portfolio</div>
+        <div class="page-sub">Asset allocation and performance analysis</div>
+      </div>
+
+      <div class="grid-3" id="port-stats"></div>
+
+      <div class="grid-2">
+        <div class="card">
+          <div class="chart-label">Asset Allocation</div>
+          <div class="chart-wrap" style="height:260px"><canvas id="chart-allocation"></canvas></div>
+        </div>
+        <div class="card">
+          <div class="chart-label">Performance by Type</div>
+          <div class="chart-wrap" style="height:260px"><canvas id="chart-perf-type"></canvas></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="chart-label">Portfolio Composition</div>
+        <div id="portfolio-breakdown"></div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════ TRANSACTIONS ═══════════════════ -->
+    <div class="page" id="page-transactions">
+      <div class="page-header">
+        <div style="display:flex;align-items:center;justify-content:space-between">
+          <div>
+            <div class="page-title">Transactions</div>
+            <div class="page-sub">All your income and expenses</div>
+          </div>
+          <button class="btn btn-primary" onclick="openModal('add-txn-modal')">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" style="width:14px;height:14px"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/></svg>
+            Add Transaction
+          </button>
+        </div>
+      </div>
+
+      <div class="grid-3" id="txn-stats"></div>
+
+      <div class="card" style="margin-bottom:16px">
+        <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+          <div class="search-wrap" style="flex:1;min-width:200px">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z"/></svg>
+            <input type="text" class="form-input search-input" id="txn-search" placeholder="Search transactions..." oninput="renderTransactions()">
+          </div>
+          <select class="form-select" style="width:auto" id="txn-filter-type" onchange="renderTransactions()">
+            <option value="all">All Types</option>
+            <option value="income">Income</option>
+            <option value="expense">Expense</option>
+          </select>
+          <select class="form-select" style="width:auto" id="txn-filter-cat" onchange="renderTransactions()">
+            <option value="all">All Categories</option>
+            <option value="Food">Food</option>
+            <option value="Transport">Transport</option>
+            <option value="Bills">Bills</option>
+            <option value="Investment">Investment</option>
+            <option value="Lifestyle">Lifestyle</option>
+            <option value="Salary">Salary</option>
+            <option value="Other">Other</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>Date</th><th>Description</th><th>Category</th><th>Type</th><th>Amount</th><th></th></tr>
+            </thead>
+            <tbody id="txn-table"></tbody>
+          </table>
+          <div id="txn-empty" class="empty-state" style="display:none">
+            <div class="empty-state-icon">💳</div>
+            <div class="empty-state-title">No transactions yet</div>
+            <div class="empty-state-sub">Add your first transaction to get started</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top:16px">
+        <div class="chart-label">Monthly Cash Flow</div>
+        <div class="chart-wrap" style="height:200px"><canvas id="chart-cashflow"></canvas></div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════ GOALS ═══════════════════ -->
+    <div class="page" id="page-goals">
+      <div class="page-header">
+        <div style="display:flex;align-items:center;justify-content:space-between">
+          <div>
+            <div class="page-title">Financial Goals</div>
+            <div class="page-sub">Track your milestones and targets</div>
+          </div>
+          <button class="btn btn-primary" onclick="openModal('add-goal-modal')">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" style="width:14px;height:14px"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/></svg>
+            New Goal
+          </button>
+        </div>
+      </div>
+
+      <div id="goals-list"></div>
+    </div>
+
+    <!-- ═══════════════════ ANALYTICS ═══════════════════ -->
+    <div class="page" id="page-analytics">
+      <div class="page-header">
+        <div class="page-title">Smart Analytics</div>
+        <div class="page-sub">Deep insights into your financial health</div>
+      </div>
+
+      <div class="grid-4" id="analytics-kpis"></div>
+
+      <div class="grid-2">
+        <div class="card">
+          <div class="chart-label">Spending by Category (This Month)</div>
+          <div class="chart-wrap" style="height:220px"><canvas id="chart-cat-bar"></canvas></div>
+        </div>
+        <div class="card" id="fire-calc-card">
+          <div class="chart-label">🔥 FIRE Calculator</div>
+          <div class="form-grid">
+            <div class="form-group">
+              <label class="form-label">Monthly Expenses (<span class="fire-curr"></span>)</label>
+              <input type="number" class="form-input" id="fire-expenses" value="3000" oninput="calcFire()">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Current Savings (<span class="fire-curr"></span>)</label>
+              <input type="number" class="form-input" id="fire-savings" value="50000" oninput="calcFire()">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Monthly Saving (<span class="fire-curr"></span>)</label>
+              <input type="number" class="form-input" id="fire-monthly" value="2000" oninput="calcFire()">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Expected Return (%)</label>
+              <input type="number" class="form-input" id="fire-return" value="7" oninput="calcFire()">
+            </div>
+          </div>
+          <div class="fire-result" id="fire-result"></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="chart-label">Retirement Projection</div>
+        <div class="chart-wrap" style="height:220px"><canvas id="chart-retirement"></canvas></div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════ SIMULATOR ═══════════════════ -->
+    <div class="page" id="page-simulator">
+      <div class="page-header">
+        <div class="page-title">What-If Simulator</div>
+        <div class="page-sub">Model different financial scenarios</div>
+      </div>
+
+      <div class="grid-2">
+        <div class="card">
+          <div class="chart-label">Scenario Parameters</div>
+          <div class="form-group">
+            <label class="form-label">Initial Investment (<span class="sim-curr"></span>)</label>
+            <input type="number" class="form-input" id="sim-initial" value="10000" oninput="runSimulator()">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Monthly Contribution (<span class="sim-curr"></span>)</label>
+            <input type="number" class="form-input" id="sim-monthly" value="500" oninput="runSimulator()">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Annual Return (%)</label>
+            <input type="number" class="form-input" id="sim-return" value="8" oninput="runSimulator()">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Time Horizon (years)</label>
+            <input type="number" class="form-input" id="sim-years" value="20" oninput="runSimulator()">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Scenario B Monthly Contribution (<span class="sim-curr"></span>)</label>
+            <input type="number" class="form-input" id="sim-monthly-b" value="1000" oninput="runSimulator()">
+          </div>
+          <div id="sim-summary" style="margin-top:16px"></div>
+        </div>
+        <div class="card">
+          <div class="chart-label">Growth Projection</div>
+          <div class="chart-wrap" style="height:320px"><canvas id="chart-sim"></canvas></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════ SUBSCRIPTIONS ═══════════════════ -->
+    <div class="page" id="page-subscriptions">
+      <div class="page-header">
+        <div style="display:flex;align-items:center;justify-content:space-between">
+          <div>
+            <div class="page-title">Subscriptions</div>
+            <div class="page-sub">Recurring payments and bills tracker</div>
+          </div>
+          <button class="btn btn-primary" onclick="openModal('add-sub-modal')">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" style="width:14px;height:14px"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/></svg>
+            Add Subscription
+          </button>
+        </div>
+      </div>
+
+      <div class="grid-3" id="sub-stats"></div>
+
+      <div class="card">
+        <div id="sub-list"></div>
+        <div id="sub-empty" class="empty-state" style="display:none">
+          <div class="empty-state-icon">🔄</div>
+          <div class="empty-state-title">No subscriptions tracked</div>
+          <div class="empty-state-sub">Add Netflix, Spotify, loans, bills and more</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════ SETTINGS ═══════════════════ -->
+    <div class="page" id="page-settings">
+      <div class="page-header">
+        <div class="page-title">Settings</div>
+        <div class="page-sub">Manage your preferences and data</div>
+      </div>
+
+      <!-- Profile & Income -->
+      <div class="card" style="margin-bottom:16px">
+        <div class="chart-label" style="margin-bottom:16px" data-i18n-prefix="👤 " data-i18n="profile">👤 Profile</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px">
+          <div class="form-group" style="margin:0">
+            <label class="form-label" data-i18n="yourName">Your Name</label>
+            <input type="text" id="settings-name" class="form-input" placeholder="e.g. Ahmad">
+          </div>
+          <div class="form-group" style="margin:0">
+            <label class="form-label">Monthly Income</label>
+            <input type="number" id="settings-income" class="form-input" placeholder="e.g. 5000" min="0">
+          </div>
+        </div>
+        <div class="form-group" style="margin-bottom:14px">
+          <label class="form-label" data-i18n="budgetLimit">Monthly Budget Limit <span style="color:var(--text-muted);font-weight:400">(optional — shows progress bar on home)</span></label>
+          <input type="number" id="settings-budget" class="form-input" placeholder="e.g. 3000 — leave blank for no limit" min="0">
+        </div>
+        <button class="btn btn-primary" onclick="saveSettingsProfile()" style="width:100%" data-i18n="saveProfile">Save Profile</button>
+      </div>
+
+      <!-- Appearance -->
+      <div class="card" style="margin-bottom:16px">
+        <div class="chart-label" style="margin-bottom:16px" data-i18n-prefix="🎨 " data-i18n="appearance">🎨 Appearance</div>
+
+        <div style="margin-bottom:16px">
+          <div style="font-size:12px;font-weight:600;color:var(--text-muted);margin-bottom:8px;text-transform:uppercase;letter-spacing:0.05em" data-i18n="theme">Theme</div>
+          <div id="settings-theme-btns" style="display:flex;gap:8px"></div>
+        </div>
+
+        <div style="margin-top:4px">
+          <div style="font-size:12px;font-weight:600;color:var(--text-muted);margin-bottom:8px;text-transform:uppercase;letter-spacing:0.05em" data-i18n="currency">Currency</div>
+          <select id="settings-currency-sel" class="form-select" onchange="window.setCurrencyNew(this.value)">
+            <option value="MYR">RM — Malaysian Ringgit</option>
+            <option value="USD">$ — US Dollar</option>
+            <option value="SGD">S$ — Singapore Dollar</option>
+            <option value="EUR">€ — Euro</option>
+            <option value="GBP">£ — British Pound</option>
+            <option value="JPY">¥ — Japanese Yen</option>
+            <option value="KRW">₩ — South Korean Won</option>
+            <option value="AUD">A$ — Australian Dollar</option>
+            <option value="CNY">¥ — Chinese Yuan</option>
+            <option value="HKD">HK$ — Hong Kong Dollar</option>
+            <option value="THB">฿ — Thai Baht</option>
+            <option value="IDR">Rp — Indonesian Rupiah</option>
+          </select>
+          <div style="font-size:11px;color:var(--text-muted);margin-top:5px">Live exchange rates updated hourly</div>
+        </div>
+
+        <div style="margin-top:16px">
+          <div style="font-size:12px;font-weight:600;color:var(--text-muted);margin-bottom:8px;text-transform:uppercase;letter-spacing:0.05em" data-i18n="language">Language</div>
+          <select id="settings-language-sel" class="form-select" onchange="window.setLanguage(this.value)">
+            <option value="en">🇬🇧 English</option>
+            <option value="ms">🇲🇾 Bahasa Malaysia</option>
+            <option value="zh">🇨🇳 中文 (Chinese)</option>
+            <option value="ja">🇯🇵 日本語 (Japanese)</option>
+            <option value="ko">🇰🇷 한국어 (Korean)</option>
+            <option value="es">🇪🇸 Español (Spanish)</option>
+            <option value="fr">🇫🇷 Français (French)</option>
+            <option value="de">🇩🇪 Deutsch (German)</option>
+            <option value="hi">🇮🇳 हिन्दी (Hindi)</option>
+            <option value="ar">🇸🇦 العربية (Arabic)</option>
+          </select>
+        </div>
+
+        <div style="display:flex;align-items:center;justify-content:space-between;padding-top:16px;margin-top:16px;border-top:1px solid var(--border)">
+          <div>
+            <div style="font-weight:600;font-size:13.5px;margin-bottom:2px" data-i18n="hideNumbers">Hide Sensitive Numbers</div>
+            <div style="font-size:12px;color:var(--text-muted)">Replace amounts with •••• on Home &amp; Dashboard</div>
+          </div>
+          <label class="toggle">
+            <input type="checkbox" id="settings-hide-numbers" onchange="toggleHideNumbers()">
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+      </div>
+
+      <!-- Investments -->
+      <div class="card" style="margin-bottom:16px">
+        <div class="chart-label" style="margin-bottom:16px">📈 Investments</div>
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border)">
+          <div>
+            <div style="font-weight:600;font-size:13.5px;margin-bottom:2px">Auto-Refresh Prices</div>
+            <div style="font-size:12px;color:var(--text-muted)">Automatically fetch live prices</div>
+          </div>
+          <select class="form-select" style="width:auto" id="settings-refresh-sel" onchange="setAutoRefresh(parseInt(this.value))">
+            <option value="0">Off</option>
+            <option value="1">Every 1 min</option>
+            <option value="5" selected>Every 5 min</option>
+            <option value="15">Every 15 min</option>
+            <option value="30">Every 30 min</option>
+          </select>
+        </div>
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0">
+          <div>
+            <div style="font-weight:600;font-size:13.5px;margin-bottom:2px">USD → MYR Rate</div>
+            <div style="font-size:12px;color:var(--text-muted)">Used for currency conversion</div>
+          </div>
+          <div style="font-family:'DM Mono',monospace;font-size:13px;color:var(--text-secondary)">4.47 (fixed)</div>
+        </div>
+      </div>
+
+      <!-- AI Advisor Key -->
+      <div class="card" style="margin-bottom:16px">
+        <div class="chart-label" style="margin-bottom:4px">✨ AI Advisor</div>
+        <div style="font-size:12px;color:var(--text-muted);margin-bottom:14px;line-height:1.6">
+          Free — uses Google Gemini.<br>
+          Get your key: go to <strong>aistudio.google.com/apikey</strong> → sign in with Google → Create API key → paste it below.
+        </div>
+        <div class="form-group" style="margin-bottom:10px">
+          <label class="form-label">Gemini API Key</label>
+          <div style="display:flex;gap:8px">
+            <input type="password" id="settings-gemini-key" class="form-input" placeholder="AIzaSy...">
+            <button class="btn btn-primary" onclick="window.saveGeminiKey()" style="white-space:nowrap;padding:0 16px">Save</button>
+          </div>
+        </div>
+        <div id="gemini-key-status" style="font-size:12px;margin-top:4px"></div>
+      </div>
+
+      <!-- Data Management -->
+      <div class="card" style="margin-bottom:16px">
+        <div class="chart-label" style="margin-bottom:16px" data-i18n-prefix="🗄️ " data-i18n="data">🗄️ Data</div>
+        <div style="display:flex;flex-direction:column;gap:10px">
+          <button class="btn btn-ghost" onclick="openEditIncome()" style="justify-content:flex-start">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" style="width:16px;height:16px"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v12m-3-2.818l.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            Edit Monthly Income
+          </button>
+          <button class="btn btn-ghost" onclick="exportData()" style="justify-content:flex-start">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" style="width:16px;height:16px"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"/></svg>
+            Export Backup (JSON)
+          </button>
+          <button class="btn btn-ghost" onclick="document.getElementById('import-file').click()" style="justify-content:flex-start">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" style="width:16px;height:16px"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5"/></svg>
+            Import Backup (JSON)
+          </button>
+          <input type="file" id="import-file" accept=".json" style="display:none" onchange="importData(event)">
+          <button class="btn btn-ghost" onclick="takeNetworthSnapshot()" style="justify-content:flex-start">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" style="width:16px;height:16px"><path stroke-linecap="round" stroke-linejoin="round" d="M6.827 6.175A2.31 2.31 0 015.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 00-1.134-.175 2.31 2.31 0 01-1.64-1.055l-.822-1.316a2.192 2.192 0 00-1.736-1.039 48.774 48.774 0 00-5.232 0 2.192 2.192 0 00-1.736 1.039l-.821 1.316z"/><path stroke-linecap="round" stroke-linejoin="round" d="M16.5 12.75a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0zM18.75 10.5h.008v.008h-.008V10.5z"/></svg>
+            Save Net Worth Snapshot
+          </button>
+          <div style="height:1px;background:var(--border);margin:4px 0"></div>
+          <button class="btn btn-danger" onclick="confirmReset()" style="justify-content:flex-start">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" style="width:16px;height:16px"><path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"/></svg>
+            Reset All Data
+          </button>
+        </div>
+      </div>
+
+      <!-- About -->
+      <div class="card">
+        <div class="chart-label" style="margin-bottom:12px">ℹ️ About WealthOS</div>
+        <div style="font-size:12.5px;color:var(--text-muted);line-height:1.7">
+          <div>Version 3.0 · Personal Finance PWA</div>
+          <div>All data stored locally on your device.</div>
+          <div>No accounts, no servers, no tracking.</div>
+        </div>
+      </div>
+    </div>
+    <!-- ═══════════════════ QUICK ADD (HOME) ═══════════════════ -->
+    <div class="page" id="page-quickadd">
+      <div class="page-header">
+        <div>
+          <div class="page-title" id="qa-greeting">Good morning 👋</div>
+          <div class="page-sub">What would you like to track today?</div>
+        </div>
+      </div>
+
+      <!-- Big action buttons -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:16px">
+        <button onclick="quickAddExpense()" class="qa-big-btn qa-expense-btn">
+          <div style="font-size:34px">💸</div>
+          <div style="font-size:14px;font-weight:700;color:var(--red)">Add Expense</div>
+          <div style="font-size:11px;color:var(--text-muted)">Record spending</div>
+        </button>
+        <button onclick="quickAddIncome()" class="qa-big-btn qa-income-btn">
+          <div style="font-size:34px">💰</div>
+          <div style="font-size:14px;font-weight:700;color:var(--green)">Add Income</div>
+          <div style="font-size:11px;color:var(--text-muted)">Record earnings</div>
+        </button>
+      </div>
+
+      <!-- More shortcuts -->
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px">
+        <button onclick="navigate('investments');setTimeout(()=>openModal('add-inv-modal'),100)" class="qa-icon-btn">
+          <div style="font-size:22px">📈</div>
+          <div style="font-size:10px;font-weight:600;color:var(--text-secondary)">Invest</div>
+        </button>
+        <button onclick="navigate('subscriptions');setTimeout(()=>openModal('add-sub-modal'),100)" class="qa-icon-btn">
+          <div style="font-size:22px">🔄</div>
+          <div style="font-size:10px;font-weight:600;color:var(--text-secondary)">Subscribe</div>
+        </button>
+        <button onclick="navigate('goals');setTimeout(()=>openModal('add-goal-modal'),100)" class="qa-icon-btn">
+          <div style="font-size:22px">🎯</div>
+          <div style="font-size:10px;font-weight:600;color:var(--text-secondary)">Goal</div>
+        </button>
+        <button onclick="navigate('calendar')" class="qa-icon-btn">
+          <div style="font-size:22px">📅</div>
+          <div style="font-size:10px;font-weight:600;color:var(--text-secondary)">Calendar</div>
+        </button>
+      </div>
+
+      <!-- Subscription reminders -->
+      <div id="quickadd-reminders"></div>
+
+      <!-- This month summary -->
+      <div class="card" style="margin-bottom:16px">
+        <div class="chart-label" style="margin-bottom:12px">This Month</div>
+        <div id="quickadd-summary"></div>
+      </div>
+
+      <!-- Recent transactions -->
+      <div class="card">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+          <div class="chart-label" style="margin-bottom:0">Recent Transactions</div>
+          <span class="badge badge-blue" style="cursor:pointer" onclick="navigate('transactions')">View all</span>
+        </div>
+        <div id="quickadd-recent"></div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════ CALENDAR ═══════════════════ -->
+    <div class="page" id="page-calendar">
+      <div class="page-header">
+        <div class="page-title">Calendar</div>
+        <div class="page-sub">Track income &amp; expenses by day</div>
+      </div>
+
+      <div class="card">
+        <!-- Month navigation -->
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+          <button class="btn btn-ghost btn-sm" onclick="calPrev()">&#8249; Prev</button>
+          <div style="font-weight:700;font-size:15px" id="cal-month-label"></div>
+          <button class="btn btn-ghost btn-sm" onclick="calNext()">Next &#8250;</button>
+        </div>
+        <!-- Legend -->
+        <div style="display:flex;gap:14px;margin-bottom:12px;font-size:11px;color:var(--text-muted)">
+          <span><span style="color:var(--green);font-weight:600">+</span> Income</span>
+          <span><span style="color:var(--red);font-weight:600">-</span> Expense</span>
+          <span style="margin-left:auto;color:var(--blue)">Tap a day to add / edit</span>
+        </div>
+        <div id="calendar-grid" style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px"></div>
+      </div>
+    </div>
+
+
+    <!-- ═══════════════════ AI ADVISOR ═══════════════════ -->
+    <div class="page" id="page-ai-advisor">
+      <div class="page-header">
+        <div class="page-title" style="display:flex;align-items:center;gap:10px">
+          <span style="font-size:22px">✨</span> AI Advisor
+        </div>
+        <div class="page-sub">Ask anything about your finances — powered by Claude AI</div>
+      </div>
+
+      <!-- Suggested questions -->
+      <div id="ai-suggestions" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px">
+        <button class="ai-suggest-btn" onclick="sendAiSuggestion(this)">Am I spending too much?</button>
+        <button class="ai-suggest-btn" onclick="sendAiSuggestion(this)">How are my investments performing?</button>
+        <button class="ai-suggest-btn" onclick="sendAiSuggestion(this)">Which subscriptions should I cancel?</button>
+        <button class="ai-suggest-btn" onclick="sendAiSuggestion(this)">Am I on track with my goals?</button>
+        <button class="ai-suggest-btn" onclick="sendAiSuggestion(this)">How can I improve my savings rate?</button>
+        <button class="ai-suggest-btn" onclick="sendAiSuggestion(this)">Give me a full financial summary</button>
+      </div>
+
+      <!-- Chat messages -->
+      <div class="card" style="margin-bottom:12px;padding:0;overflow:hidden">
+        <div id="ai-messages" style="min-height:320px;max-height:480px;overflow-y:auto;padding:20px;display:flex;flex-direction:column;gap:16px">
+          <div class="ai-msg ai-msg-assistant">
+            <div class="ai-msg-avatar">✨</div>
+            <div class="ai-msg-bubble">
+              Hi! I'm your AI financial advisor powered by Claude. I have access to all your WealthOS data — your transactions, investments, goals, and subscriptions.<br><br>Ask me anything about your finances and I'll give you personalised insights and advice.
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Input area -->
+      <div class="card" style="padding:12px">
+        <div style="display:flex;gap:10px;align-items:flex-end">
+          <textarea id="ai-input" placeholder="Ask me anything about your finances..." rows="2"
+            style="flex:1;background:var(--bg-elevated);border:1px solid var(--border);border-radius:12px;padding:12px;color:var(--text-primary);font-family:inherit;font-size:14px;resize:none;outline:none;line-height:1.5"
+            onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendAiMessage()}"
+          ></textarea>
+          <button onclick="sendAiMessage()" id="ai-send-btn"
+            style="background:var(--blue);border:none;border-radius:12px;padding:12px 18px;cursor:pointer;color:white;font-weight:700;font-size:14px;white-space:nowrap;transition:opacity 0.2s;height:48px">
+            Send
+          </button>
+        </div>
+        <div style="font-size:11px;color:var(--text-muted);margin-top:8px;text-align:center">
+          Shift+Enter for new line · Enter to send · Your data stays on your device
+        </div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<!-- ═══════════ MODALS ═══════════ -->
+<!-- Edit Monthly Income Modal -->
+<div class="modal-overlay" id="edit-income-modal">
+  <div class="modal" style="max-width:380px">
+    <div class="modal-header">
+      <div class="modal-title">Edit Monthly Income</div>
+      <div class="modal-close" onclick="closeModal('edit-income-modal')">✕</div>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:13px;color:var(--text-muted);margin-bottom:16px">Update your base monthly income. This is used when no salary transactions exist for the month.</p>
+      <div class="form-group">
+        <label class="form-label">Monthly Income</label>
+        <input type="number" id="edit-income-val" class="form-input" placeholder="e.g. 5000" min="0" step="0.01">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('edit-income-modal')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveMonthlyIncome()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Calendar Day Modal -->
+<div class="modal-overlay" id="cal-day-modal">
+  <div class="modal" style="max-width:480px">
+    <div class="modal-header">
+      <div class="modal-title" id="cal-day-label">Day</div>
+      <div class="modal-close" onclick="closeModal('cal-day-modal')">✕</div>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="cal-day-date">
+      <div id="cal-day-txns" style="max-height:300px;overflow-y:auto;margin-bottom:16px"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('cal-day-modal')">Close</button>
+      <button class="btn btn-primary" onclick="addTxnForCalDay()">+ Add Transaction</button>
+    </div>
+  </div>
+</div>
+
+
+
+<!-- Add Transaction Modal -->
+<div class="modal-overlay" id="add-txn-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title" id="txn-modal-title">Add Transaction</div>
+      <div class="modal-close" onclick="closeModal('add-txn-modal')">✕</div>
+    </div>
+    <input type="hidden" id="txn-edit-id">
+    <div class="form-group">
+      <label class="form-label">Type</label>
+      <div class="seg-ctrl" style="width:100%;justify-content:stretch">
+        <button class="seg-btn active" id="txn-type-income" onclick="selectTxnType('income')" style="flex:1">Income</button>
+        <button class="seg-btn" id="txn-type-expense" onclick="selectTxnType('expense')" style="flex:1">Expense</button>
+      </div>
+    </div>
+    <div class="form-grid">
+      <div class="form-group">
+        <label class="form-label">Description</label>
+        <input type="text" class="form-input" id="txn-desc" placeholder="e.g. Grocery shopping">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Amount (<span class="txn-curr-label"></span>)</label>
+        <input type="number" class="form-input" id="txn-amount" placeholder="0.00">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Category</label>
+        <select class="form-select" id="txn-cat">
+          <option value="Salary">Salary</option>
+          <option value="Food">Food</option>
+          <option value="Transport">Transport</option>
+          <option value="Bills">Bills</option>
+          <option value="Investment">Investment</option>
+          <option value="Lifestyle">Lifestyle</option>
+          <option value="Other">Other</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Date</label>
+        <input type="date" class="form-input" id="txn-date">
+      </div>
+    </div>
+    <div style="display:flex;gap:10px;margin-top:8px">
+      <button class="btn btn-ghost" onclick="closeModal('add-txn-modal')" style="flex:1">Cancel</button>
+      <button class="btn btn-primary" onclick="saveTransaction()" style="flex:2" data-i18n-save="1">+ Save Income</button>
+    </div>
+  </div>
+</div>
+
+<!-- Add Investment Modal -->
+<div class="modal-overlay" id="add-inv-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title" id="inv-modal-title">Add Investment</div>
+      <div class="modal-close" onclick="closeModal('add-inv-modal')">✕</div>
+    </div>
+    <input type="hidden" id="inv-edit-id">
+
+    <!-- Step 1: Date + Ticker -->
+    <div style="font-size:11px;font-weight:700;color:var(--text-muted);letter-spacing:0.1em;text-transform:uppercase;margin-bottom:10px">① Set purchase date first, then fetch price</div>
+
+    <div class="form-grid" style="margin-bottom:0">
+      <div class="form-group">
+        <label class="form-label">Purchase Date</label>
+        <input type="date" class="form-input" id="inv-date">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Currency</label>
+        <select class="form-select" id="inv-currency">
+          <option value="MYR">🇲🇾 MYR (RM)</option>
+          <option value="USD">🇺🇸 USD ($)</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Ticker + fetch -->
+    <div class="form-group">
+      <label class="form-label">Ticker Symbol</label>
+      <div style="display:flex;gap:8px">
+        <input type="text" class="form-input" id="inv-name" placeholder="e.g. AAPL, BTC, GC=F" oninput="this.value=this.value.toUpperCase()" style="flex:1;font-family:'DM Mono',monospace;font-size:15px;font-weight:600;letter-spacing:0.04em">
+        <button class="btn btn-ghost" id="inv-fetch-btn" onclick="invFetchPrice()" style="white-space:nowrap;flex-shrink:0">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" style="width:14px;height:14px"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99"/></svg>
+          Fetch Price
+        </button>
+      </div>
+      <div style="font-size:11px;color:var(--text-muted);margin-top:5px">
+        Stocks/ETFs: <code style="background:var(--bg-elevated);padding:1px 5px;border-radius:4px">AAPL VOO MSFT</code> &nbsp;
+        Crypto: <code style="background:var(--bg-elevated);padding:1px 5px;border-radius:4px">BTC ETH SOL</code> &nbsp;
+        Gold: <code style="background:var(--bg-elevated);padding:1px 5px;border-radius:4px">GC=F</code>
+      </div>
+    </div>
+
+    <!-- Price result card — dynamically populated by invFetchPrice() -->
+    <div id="inv-fetch-result" style="display:none;background:var(--bg-elevated);border:1px solid var(--border-accent);border-radius:12px;padding:16px;margin-bottom:16px"></div>
+
+    <div class="form-grid">
+      <div class="form-group">
+        <label class="form-label">Asset Type</label>
+        <select class="form-select" id="inv-type">
+          <option value="stock">Stock</option>
+          <option value="etf">ETF</option>
+          <option value="crypto">Crypto</option>
+          <option value="commodity">Commodity</option>
+          <option value="bond">Bond</option>
+          <option value="cash">Cash</option>
+          <option value="property">Property</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Quantity / Units</label>
+        <input type="number" class="form-input" id="inv-qty" placeholder="0" step="any" oninput="updatePnlPreview()">
+      </div>
+      <div class="form-group" style="grid-column:1/-1">
+        <label class="form-label">Buy Price <span style="color:var(--text-muted);font-weight:400;text-transform:none;font-size:10px">— auto-filled from purchase date, or override manually</span></label>
+        <input type="number" class="form-input" id="inv-buy" placeholder="Auto-fetched from purchase date" step="any">
+      </div>
+    </div>
+
+    <div id="inv-save-status" style="font-size:12px;color:var(--text-muted);margin-bottom:10px;min-height:18px"></div>
+    <div style="display:flex;gap:10px">
+      <button class="btn btn-ghost" onclick="closeModal('add-inv-modal')" style="flex:1">Cancel</button>
+      <button class="btn btn-primary" id="inv-save-btn" onclick="saveInvestment()" style="flex:2">Save Investment</button>
+    </div>
+  </div>
+</div>
+
+<!-- Add Goal Modal -->
+<div class="modal-overlay" id="add-goal-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title" id="goal-modal-title">New Financial Goal</div>
+      <div class="modal-close" onclick="closeModal('add-goal-modal')">✕</div>
+    </div>
+    <input type="hidden" id="goal-edit-id">
+    <div class="form-group">
+      <label class="form-label">Goal Name</label>
+      <input type="text" class="form-input" id="goal-name" placeholder="e.g. Emergency Fund, Dream Car">
+    </div>
+    <div class="form-grid">
+      <div class="form-group">
+        <label class="form-label">Target Amount (<span class="goal-curr-label"></span>)</label>
+        <input type="number" class="form-input" id="goal-target" placeholder="10000">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Current Amount (<span class="goal-curr-label"></span>)</label>
+        <input type="number" class="form-input" id="goal-current" placeholder="0">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Monthly Saving (<span class="goal-curr-label"></span>)</label>
+        <input type="number" class="form-input" id="goal-monthly" placeholder="500">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Target Date</label>
+        <input type="date" class="form-input" id="goal-date">
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Icon</label>
+      <div style="display:flex;gap:8px;flex-wrap:wrap" id="goal-icon-picker">
+        <span class="goal-icon-opt" data-icon="🏠">🏠</span>
+        <span class="goal-icon-opt" data-icon="🚗">🚗</span>
+        <span class="goal-icon-opt" data-icon="✈️">✈️</span>
+        <span class="goal-icon-opt" data-icon="💰">💰</span>
+        <span class="goal-icon-opt" data-icon="🏖️">🏖️</span>
+        <span class="goal-icon-opt" data-icon="📱">📱</span>
+        <span class="goal-icon-opt" data-icon="💍">💍</span>
+        <span class="goal-icon-opt" data-icon="🎓">🎓</span>
+        <span class="goal-icon-opt selected" data-icon="🎯">🎯</span>
+      </div>
+    </div>
+    <div style="display:flex;gap:10px;margin-top:8px">
+      <button class="btn btn-ghost" onclick="closeModal('add-goal-modal')" style="flex:1">Cancel</button>
+      <button class="btn btn-primary" onclick="saveGoal()" style="flex:2">Save Goal</button>
+    </div>
+  </div>
+</div>
+
+<!-- Add Subscription Modal -->
+<div class="modal-overlay" id="add-sub-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title" id="sub-modal-title">Add Subscription</div>
+      <div class="modal-close" onclick="closeModal('add-sub-modal')">✕</div>
+    </div>
+    <input type="hidden" id="sub-edit-id">
+    <div class="form-grid">
+      <div class="form-group">
+        <label class="form-label">Service Name</label>
+        <input type="text" class="form-input" id="sub-name" placeholder="e.g. Netflix, Spotify">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Icon (emoji)</label>
+        <input type="text" class="form-input" id="sub-icon" placeholder="🎬" maxlength="4">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Amount (<span class="sub-curr-label"></span>)</label>
+        <input type="number" class="form-input" id="sub-amount" placeholder="0.00">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Billing Cycle</label>
+        <select class="form-select" id="sub-cycle">
+          <option value="monthly">Monthly</option>
+          <option value="yearly">Yearly</option>
+          <option value="weekly">Weekly</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Category</label>
+        <select class="form-select" id="sub-cat">
+          <option value="entertainment">Entertainment</option>
+          <option value="productivity">Productivity</option>
+          <option value="utilities">Utilities</option>
+          <option value="finance">Finance / Loans</option>
+          <option value="health">Health</option>
+          <option value="other">Other</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Next Renewal</label>
+        <input type="date" class="form-input" id="sub-renewal">
+      </div>
+    </div>
+    <div style="display:flex;gap:10px;margin-top:8px">
+      <button class="btn btn-ghost" onclick="closeModal('add-sub-modal')" style="flex:1">Cancel</button>
+      <button class="btn btn-primary" onclick="saveSubscription()" style="flex:2">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Edit Investment Price Modal -->
+<div class="modal-overlay" id="edit-price-modal">
+  <div class="modal" style="max-width:360px">
+    <div class="modal-header">
+      <div class="modal-title">Update Price</div>
+      <div class="modal-close" onclick="closeModal('edit-price-modal')">✕</div>
+    </div>
+    <input type="hidden" id="price-edit-id">
+    <div class="form-group">
+      <label class="form-label">Current Price (<span class="price-curr-label"></span>)</label>
+      <input type="number" class="form-input" id="price-new" step="any">
+    </div>
+    <div style="display:flex;gap:10px">
+      <button class="btn btn-ghost" onclick="closeModal('edit-price-modal')" style="flex:1">Cancel</button>
+      <button class="btn btn-primary" onclick="updatePrice()" style="flex:2">Update</button>
+    </div>
+  </div>
+</div>
+
+<style>
+.goal-icon-opt {
+  font-size: 22px; padding: 6px 8px; border-radius: 8px;
+  cursor: pointer; border: 2px solid transparent;
+  transition: all 0.15s;
+}
+.goal-icon-opt:hover { background: var(--bg-elevated); }
+.goal-icon-opt.selected { border-color: var(--green); background: var(--green-dim); }
+</style>
+
+
+<!-- ═══════════ ONBOARDING ═══════════ -->
+<div id="onboarding-overlay" style="display:none;position:fixed;inset:0;background:rgba(8,12,20,0.97);backdrop-filter:blur(12px);z-index:2000;align-items:center;justify-content:center;padding:20px">
+  <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:24px;padding:36px;width:100%;max-width:480px;animation:modalIn 0.4s cubic-bezier(0.34,1.4,0.64,1)">
+    <div style="text-align:center;margin-bottom:28px">
+      <div style="width:56px;height:56px;background:linear-gradient(135deg,#00f5a0,#00d4aa);border-radius:16px;display:flex;align-items:center;justify-content:center;font-family:Syne,sans-serif;font-weight:800;font-size:24px;color:#080c14;margin:0 auto 16px">W</div>
+      <div style="font-family:Syne,sans-serif;font-size:24px;font-weight:800;letter-spacing:-0.04em;margin-bottom:6px">Welcome to WealthOS</div>
+      <div style="color:var(--text-secondary);font-size:13.5px">Let&apos;s set up your financial profile. Takes 30 seconds.</div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Your Name</label>
+      <input type="text" class="form-input" id="ob-name" placeholder="e.g. Ahmad, Sarah..." autocomplete="given-name">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Currency</label>
+      <select class="form-select" id="ob-currency">
+        <option value="MYR">🇲🇾 Malaysian Ringgit (MYR)</option>
+        <option value="USD">🇺🇸 US Dollar (USD)</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Monthly Income <span style="color:var(--text-muted);font-weight:400;text-transform:none">(optional — for savings rate tracking)</span></label>
+      <input type="number" class="form-input" id="ob-income" placeholder="e.g. 5000" min="0">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Current Cash / Savings <span style="color:var(--text-muted);font-weight:400;text-transform:none">(optional — adds as opening balance)</span></label>
+      <input type="number" class="form-input" id="ob-cash" placeholder="e.g. 15000" min="0">
+    </div>
+    <button class="btn btn-primary" onclick="closeOnboarding()" style="width:100%;justify-content:center;padding:13px;font-size:15px;margin-top:8px">
+      Get Started →
+    </button>
+    <div style="text-align:center;margin-top:12px;font-size:12px;color:var(--text-muted)">
+      🔒 All data stays on your device. No account needed.
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════ CONFIRM DIALOG ═══════════ -->
+<div id="confirm-overlay" style="display:none;position:fixed;inset:0;background:rgba(8,12,20,0.85);backdrop-filter:blur(6px);z-index:3000;align-items:center;justify-content:center;padding:20px">
+  <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:18px;padding:28px;width:100%;max-width:360px;animation:modalIn 0.2s ease">
+    <div style="font-size:20px;margin-bottom:8px">⚠️</div>
+    <div id="confirm-msg" style="font-weight:600;font-size:15px;margin-bottom:20px;line-height:1.4"></div>
+    <div style="display:flex;gap:10px">
+      <button id="confirm-no" class="btn btn-ghost" style="flex:1;justify-content:center">Cancel</button>
+      <button id="confirm-yes" class="btn btn-danger" style="flex:1;justify-content:center">Yes, delete</button>
+    </div>
+  </div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
