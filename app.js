@@ -2830,22 +2830,27 @@ window.sendAiMessage = async function() {
       buildFinancialContext();
 
     // Try multiple model names in case one is unavailable
-    var models = ['gemini-2.0-flash-lite', 'gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-flash-8b', 'gemini-1.0-pro'];
+    var models = ['gemini-2.0-flash', 'gemini-2.0-flash-lite', 'gemini-1.5-flash'];
     var reply = null;
     var lastErr = null;
 
     for (var mi = 0; mi < models.length; mi++) {
       var url = 'https://generativelanguage.googleapis.com/v1beta/models/' + models[mi] + ':generateContent?key=' + apiKey;
-      // Inject system context into first message — works on all Gemini free tiers
-      // (system_instruction requires paid tier)
-      var contentsWithCtx = aiHistory.slice();
-      if (contentsWithCtx.length > 0) {
-        contentsWithCtx = [
-          { role: 'user', parts: [{ text: systemPrompt + '\n\nUser question: ' + contentsWithCtx[0].parts[0].text }] }
-        ].concat(contentsWithCtx.slice(1));
+      // Build contents: inject system prompt into first user turn only
+      var contents = [];
+      for (var hi = 0; hi < aiHistory.length; hi++) {
+        if (hi === 0) {
+          // First user message gets the financial context prepended
+          contents.push({
+            role: 'user',
+            parts: [{ text: systemPrompt + '\n\nMy question: ' + aiHistory[hi].parts[0].text }]
+          });
+        } else {
+          contents.push(aiHistory[hi]);
+        }
       }
       var reqBody = JSON.stringify({
-        contents: contentsWithCtx,
+        contents: contents,
         generationConfig: { maxOutputTokens: 800, temperature: 0.7 }
       });
 
@@ -2875,12 +2880,16 @@ window.sendAiMessage = async function() {
           var te = document.getElementById(typingId);
           if (te) te.querySelector('.ai-msg-bubble').innerHTML = '<em style="color:var(--text-muted)">Rate limited, retrying in 3s...</em>';
           continue; // retry
-        } else if (response.status === 404 || response.status === 400) {
-          // Model not found or not supported — try next model in list
+        } else if (response.status === 404) {
+          // Model not found — try next model
           var errJ = await response.json().catch(function(){ return {}; });
           lastErr = (errJ.error && errJ.error.message) || 'Model not available';
-          // Only break out of retry loop, not the model loop
-          break;
+          break; // break retry loop, outer model loop continues
+        } else if (response.status === 400) {
+          // Bad request — show actual error, no point trying other models
+          var errJ = await response.json().catch(function(){ return {}; });
+          lastErr = (errJ.error && errJ.error.message) || 'Bad request';
+          throw new Error('API error: ' + lastErr);
         } else {
           var errData = await response.json().catch(function(){ return {}; });
           lastErr = (errData.error && errData.error.message) || ('Error ' + response.status);
