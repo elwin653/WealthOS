@@ -55,7 +55,7 @@
 html { scroll-behavior: smooth; }
 
 body {
-  font-family: 'DM Sans', sans-serif;
+  font-family: 'Space Grotesk', sans-serif;
   background: var(--bg-base);
   color: var(--text-primary);
   min-height: 100vh;
@@ -69,7 +69,7 @@ h1, h2, h3, h4, h5 {
   letter-spacing: -0.02em;
 }
 
-.mono { font-family: 'DM Mono', monospace; }
+.mono { font-family: 'Space Mono', monospace; }
 
 /* ── Scrollbar ── */
 ::-webkit-scrollbar { width: 4px; height: 4px; }
@@ -297,7 +297,7 @@ tr:hover td { background: var(--bg-hover); }
 tr:last-child td { border-bottom: none; }
 
 td.td-primary { color: var(--text-primary); font-weight: 500; }
-td.td-mono { font-family: 'DM Mono', monospace; font-size: 13px; }
+td.td-mono { font-family: 'Space Mono', monospace; font-size: 13px; }
 
 /* ── Forms ── */
 .form-group { margin-bottom: 16px; }
@@ -426,7 +426,7 @@ td.td-mono { font-family: 'DM Mono', monospace; font-size: 13px; }
 .sub-icon { width: 36px; height: 36px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 16px; flex-shrink: 0; }
 .sub-name { font-weight: 600; font-size: 13.5px; color: var(--text-primary); }
 .sub-cycle { font-size: 11px; color: var(--text-muted); }
-.sub-amount { font-family: 'DM Mono', monospace; font-weight: 600; font-size: 14px; color: var(--text-primary); }
+.sub-amount { font-family: 'Space Mono', monospace; font-weight: 600; font-size: 14px; color: var(--text-primary); }
 
 /* ── Segment control ── */
 .seg-ctrl {

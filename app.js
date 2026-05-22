@@ -421,16 +421,43 @@ function renderDashTxns() {
 }
 
 function renderInsights() {
-  const insights = generateInsights();
-  document.getElementById('dash-insights').innerHTML = insights.map(i => `
-    <div class="insight-card">
-      <div class="insight-icon" style="background:${i.bg}">${i.icon}</div>
-      <div>
-        <div class="insight-title">${i.title}</div>
-        <div class="insight-body">${i.body}</div>
-      </div>
-    </div>
-  `).join('') || '<div class="empty-state"><div class="empty-state-icon">🤖</div><div class="empty-state-title">Add more data for insights</div></div>';
+  var el = document.getElementById('dash-insights');
+  if (!el) return;
+  var insights = generateInsights();
+
+  // Activity bar — % of budget remaining
+  var sym = curr();
+  var mtxns = getThisMonthTxns();
+  var monthExp = getTotalExpenses(mtxns);
+  var monthInc = getTotalIncome(mtxns) || state.monthlyIncome || 0;
+  var budgetLimit = state.budgetLimit || monthInc;
+  var spentPct = budgetLimit > 0 ? Math.min(100, Math.round((monthExp / budgetLimit) * 100)) : 0;
+  var remaining = Math.max(0, budgetLimit - monthExp);
+  var barColor = spentPct >= 90 ? 'var(--red)' : spentPct >= 70 ? 'var(--amber)' : 'var(--green)';
+  var savRate = getSavingsRate();
+
+  var activityHtml = '<div style="margin-bottom:14px;padding:14px;background:var(--bg-elevated);border-radius:12px;border:1px solid var(--border)">' +
+    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">' +
+      '<div style="font-size:11px;font-weight:600;color:var(--text-muted)">BUDGET USED</div>' +
+      '<div style="font-size:13px;font-weight:700;color:' + barColor + '">' + spentPct + '%</div>' +
+    '</div>' +
+    '<div style="height:8px;background:var(--border);border-radius:99px;overflow:hidden;margin-bottom:8px">' +
+      '<div style="height:100%;width:' + spentPct + '%;background:' + barColor + ';border-radius:99px;transition:width 0.6s ease"></div>' +
+    '</div>' +
+    '<div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text-muted)">' +
+      '<span>Spent: ' + sym + monthExp.toLocaleString('en-US',{maximumFractionDigits:0}) + '</span>' +
+      '<span style="color:' + barColor + '">Left: ' + sym + remaining.toLocaleString('en-US',{maximumFractionDigits:0}) + '</span>' +
+    '</div>' +
+  '</div>';
+
+  var insightCards = insights.map(function(i) {
+    return '<div class="insight-card">' +
+      '<div class="insight-icon" style="background:' + i.bg + '">' + i.icon + '</div>' +
+      '<div><div class="insight-title">' + i.title + '</div><div class="insight-body">' + i.body + '</div></div>' +
+    '</div>';
+  }).join('');
+
+  el.innerHTML = activityHtml + (insightCards || '<div class="empty-state"><div class="empty-state-icon">🤖</div><div class="empty-state-title">Add more data for insights</div></div>');
 }
 
 function generateInsights() {
@@ -2512,11 +2539,11 @@ window.saveGeminiKey = function() {
   var keyEl = document.getElementById('settings-gemini-key');
   var key = keyEl ? keyEl.value.trim() : '';
   if (!key) { toast('Please paste your API key first', 'error'); return; }
-  if (!key.startsWith('AIza')) { toast('Invalid key — it should start with AIza', 'error'); return; }
+  if (!key.startsWith('sk-or-')) { toast('Invalid key — OpenRouter keys start with sk-or-', 'error'); return; }
   state.geminiApiKey = key;
   save();
   window.renderSettingsPage();
-  toast('✓ Gemini API key saved! Go to AI Advisor to start chatting.', 'success');
+  toast('✓ API key saved! Go to AI Advisor to start chatting.', 'success');
 };
 
 // (CURRENCIES, fxRates, fxLastFetched are declared at the top of the file)
@@ -2830,79 +2857,55 @@ window.sendAiMessage = async function() {
       buildFinancialContext();
 
     // Try multiple model names in case one is unavailable
-    var models = ['gemini-2.0-flash-exp', 'gemini-1.5-flash-latest', 'gemini-1.5-pro-latest', 'gemini-pro'];
+    // OpenRouter free API — works globally, no credit card needed
+    // Free models: llama-3.1-8b, mistral-7b, gemma-2-9b etc.
+    var freeModels = [
+      'meta-llama/llama-3.1-8b-instruct:free',
+      'mistralai/mistral-7b-instruct:free',
+      'google/gemma-2-9b-it:free'
+    ];
     var reply = null;
     var lastErr = null;
 
-    for (var mi = 0; mi < models.length; mi++) {
-      // Try v1beta first, fall back to v1 if needed
-      var baseUrl = 'https://generativelanguage.googleapis.com/v1beta/models/';
-      var url = baseUrl + models[mi] + ':generateContent?key=' + apiKey;
-      // Build contents: inject system prompt into first user turn only
-      var contents = [];
-      for (var hi = 0; hi < aiHistory.length; hi++) {
-        if (hi === 0) {
-          // First user message gets the financial context prepended
-          contents.push({
-            role: 'user',
-            parts: [{ text: systemPrompt + '\n\nMy question: ' + aiHistory[hi].parts[0].text }]
-          });
-        } else {
-          contents.push(aiHistory[hi]);
-        }
-      }
-      var reqBody = JSON.stringify({
-        contents: contents,
-        generationConfig: { maxOutputTokens: 800, temperature: 0.7 }
-      });
-
-      // Retry up to 2 times for 429 (rate limit)
-      for (var attempt = 0; attempt < 2; attempt++) {
-        if (attempt > 0) await new Promise(function(r){ setTimeout(r, 3000); }); // wait 3s before retry
-
-        var response = await fetch(url, {
+    for (var mi = 0; mi < freeModels.length; mi++) {
+      try {
+        var response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: reqBody,
-          signal: AbortSignal.timeout(20000)
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + apiKey,
+            'HTTP-Referer': window.location.href,
+            'X-Title': 'WealthOS AI Advisor'
+          },
+          body: JSON.stringify({
+            model: freeModels[mi],
+            messages: [
+              { role: 'system', content: systemPrompt },
+              ...aiHistory.map(function(m) {
+                return { role: m.role === 'model' ? 'assistant' : m.role,
+                         content: m.parts[0].text };
+              })
+            ],
+            max_tokens: 800,
+            temperature: 0.7
+          }),
+          signal: AbortSignal.timeout(30000)
         });
 
-        if (response.ok) {
-          var data = await response.json();
-          reply = data.candidates &&
-                  data.candidates[0] &&
-                  data.candidates[0].content &&
-                  data.candidates[0].content.parts &&
-                  data.candidates[0].content.parts[0] &&
-                  data.candidates[0].content.parts[0].text;
-          if (reply) break;
-        } else if (response.status === 429) {
-          lastErr = 'Rate limited — retrying...';
-          // Update typing indicator to show retrying
-          var te = document.getElementById(typingId);
-          if (te) te.querySelector('.ai-msg-bubble').innerHTML = '<em style="color:var(--text-muted)">Rate limited, retrying in 3s...</em>';
-          continue; // retry
-        } else if (response.status === 404) {
-          // Model not found — try next model
-          var errJ = await response.json().catch(function(){ return {}; });
-          lastErr = (errJ.error && errJ.error.message) || 'Model not available';
-          break; // break retry loop, outer model loop continues
-        } else if (response.status === 400) {
-          // Bad request — show actual error, no point trying other models
-          var errJ = await response.json().catch(function(){ return {}; });
-          lastErr = (errJ.error && errJ.error.message) || 'Bad request';
-          throw new Error('API error: ' + lastErr);
-        } else {
+        if (!response.ok) {
           var errData = await response.json().catch(function(){ return {}; });
           lastErr = (errData.error && errData.error.message) || ('Error ' + response.status);
-          if (response.status === 400 && lastErr.includes('API_KEY')) {
-            lastErr = 'Invalid API key — check your key in Settings.';
-            throw new Error(lastErr); // no point retrying bad key
-          }
-          break;
+          if (response.status === 401) throw new Error('Invalid API key. Check your key in Settings.');
+          continue; // try next model
         }
+
+        var data = await response.json();
+        reply = data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content;
+        if (reply) break;
+      } catch(fetchErr) {
+        if (fetchErr.message && fetchErr.message.includes('Invalid API key')) throw fetchErr;
+        lastErr = fetchErr.message || 'Connection error';
       }
-      if (reply) break;
     }
 
     if (!reply) {
