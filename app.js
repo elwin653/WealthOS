@@ -318,7 +318,14 @@ function getTotalExpenses(txns = state.transactions) {
 }
 
 function getNetWorth() {
-  return getTotalPortfolioValue() + getNetCash();
+  var accounts = state.accounts || [];
+  var walletCash = accounts.filter(function(a){ return a.type === 'cash' || a.type === 'bank'; })
+                           .reduce(function(s,a){ return s + (a.balance||0); }, 0);
+  var walletAssets = accounts.filter(function(a){ return a.type === 'asset'; })
+                             .reduce(function(s,a){ return s + (a.balance||0); }, 0);
+  var walletLiab = accounts.filter(function(a){ return a.type === 'liability'; })
+                           .reduce(function(s,a){ return s + (a.balance||0); }, 0);
+  return getTotalPortfolioValue() + getNetCash() + walletCash + walletAssets - walletLiab;
 }
 
 function getNetCash() {
