@@ -2226,12 +2226,41 @@ function buildCalendar() {
   var monthKey = calYear + '-' + String(calMonth+1).padStart(2,'0');
   var sym = state.currency === 'MYR' ? 'RM' : '$';
 
+  // Index transactions by date
   var byDate = {};
   state.transactions.forEach(function(t) {
     if (t.date && t.date.slice(0,7) === monthKey) {
-      if (!byDate[t.date]) byDate[t.date] = { income: 0, expense: 0 };
+      if (!byDate[t.date]) byDate[t.date] = { income: 0, expense: 0, subs: [] };
       if (t.type === 'income') byDate[t.date].income += t.amount;
       else byDate[t.date].expense += t.amount;
+    }
+  });
+
+  // Index subscription renewals for this month
+  (state.subscriptions || []).forEach(function(sub) {
+    if (!sub.renewal) return;
+    // Show renewal on the day it falls, even if not yet charged
+    if (sub.renewal.slice(0,7) === monthKey) {
+      if (!byDate[sub.renewal]) byDate[sub.renewal] = { income: 0, expense: 0, subs: [] };
+      byDate[sub.renewal].subs.push(sub);
+    }
+    // Also show future recurring dates (next occurrence in this month)
+    // by simulating next renewal cycles through the month
+    var d = new Date(sub.renewal + 'T00:00:00');
+    for (var tries = 0; tries < 12; tries++) {
+      var nextDate;
+      if (sub.cycle === 'monthly') { nextDate = new Date(d); nextDate.setMonth(nextDate.getMonth() + 1); }
+      else if (sub.cycle === 'weekly') { nextDate = new Date(d); nextDate.setDate(nextDate.getDate() + 7); }
+      else break; // yearly — only shows once
+      var nStr = nextDate.toISOString().slice(0,10);
+      if (nStr.slice(0,7) === monthKey) {
+        if (!byDate[nStr]) byDate[nStr] = { income: 0, expense: 0, subs: [] };
+        if (!byDate[nStr].subs.find(function(s){ return s.id === sub.id; })) {
+          byDate[nStr].subs.push(sub);
+        }
+      }
+      if (nStr.slice(0,7) > monthKey) break;
+      d = nextDate;
     }
   });
 
@@ -2247,6 +2276,12 @@ function buildCalendar() {
     if (data) {
       if (data.income > 0) dots += '<div class="cal-dot cal-dot-income">+' + (data.income >= 1000 ? (data.income/1000).toFixed(1)+'k' : data.income.toFixed(0)) + '</div>';
       if (data.expense > 0) dots += '<div class="cal-dot cal-dot-expense">-' + (data.expense >= 1000 ? (data.expense/1000).toFixed(1)+'k' : data.expense.toFixed(0)) + '</div>';
+      // Subscription dots — show name + amount
+      if (data.subs && data.subs.length) {
+        data.subs.forEach(function(sub) {
+          dots += '<div class="cal-dot cal-dot-sub" title="' + sub.name + '">' + (sub.name.length > 6 ? sub.name.slice(0,5)+'…' : sub.name) + '</div>';
+        });
+      }
     }
     html += '<div class="cal-cell' + (isToday ? ' cal-today' : '') + '" onclick="openCalDay(\'' + dateStr + '\')">' +
       '<div class="cal-day-num' + (isToday ? ' cal-today-num' : '') + '">' + d + '</div>' +
@@ -2270,33 +2305,62 @@ window.openCalDay = function(dateStr) {
 };
 
 function renderCalDayTxns(dateStr) {
-  const txns = state.transactions.filter(t => t.date === dateStr);
-  const el = document.getElementById('cal-day-txns');
-  const sym = state.currency === 'MYR' ? 'RM' : '$';
+  var txns = state.transactions.filter(function(t) { return t.date === dateStr; });
+  var el = document.getElementById('cal-day-txns');
+  var sym = curr();
 
-  if (!txns.length) {
-    el.innerHTML = '<div style="text-align:center;color:var(--text-muted);padding:20px;font-size:13px">No transactions on this day</div>';
-    return;
-  }
+  // Find subscriptions due on this date
+  var subsOnDay = (state.subscriptions || []).filter(function(sub) {
+    if (!sub.renewal) return false;
+    // Check exact renewal date or if calculated cycle falls on this date
+    if (sub.renewal === dateStr) return true;
+    // Check recurring cycles
+    var d = new Date(sub.renewal + 'T00:00:00');
+    for (var i = 0; i < 24; i++) {
+      if (sub.cycle === 'monthly') d.setMonth(d.getMonth() + 1);
+      else if (sub.cycle === 'weekly') d.setDate(d.getDate() + 7);
+      else break;
+      if (d.toISOString().slice(0,10) === dateStr) return true;
+      if (d.toISOString().slice(0,10) > dateStr) break;
+    }
+    return false;
+  });
 
-  el.innerHTML = txns.map(t => `
-    <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border)">
-      <div style="display:flex;align-items:center;gap:10px">
-        <div style="width:8px;height:8px;border-radius:50%;background:${t.type==='income'?'var(--green)':'var(--red)'}"></div>
-        <div>
-          <div style="font-size:13.5px;font-weight:500">${t.desc}</div>
-          <div style="font-size:11px;color:var(--text-muted)">${t.cat}</div>
-        </div>
-      </div>
-      <div style="display:flex;align-items:center;gap:8px">
-        <div style="font-weight:600;color:${t.type==='income'?'var(--green)':'var(--red)'}">
-          ${t.type==='income'?'+':'-'}${sym}${t.amount.toLocaleString('en-MY',{minimumFractionDigits:2,maximumFractionDigits:2})}
-        </div>
-        <button class="btn btn-ghost btn-sm" onclick="editTxnFromCal('${t.id}')" style="padding:4px 8px;font-size:11px">Edit</button>
-        <button class="btn btn-danger btn-sm" onclick="deleteTxnFromCal('${t.id}','${dateStr}')" style="padding:4px 8px;font-size:11px">✕</button>
-      </div>
-    </div>
-  `).join('');
+  var subsHtml = subsOnDay.map(function(sub) {
+    return '<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border)">' +
+      '<div style="display:flex;align-items:center;gap:10px">' +
+        '<div style="width:8px;height:8px;border-radius:50%;background:var(--amber)"></div>' +
+        '<div>' +
+          '<div style="font-size:13.5px;font-weight:500">🔄 ' + sub.name + '</div>' +
+          '<div style="font-size:11px;color:var(--amber)">Subscription renewal · ' + sub.cycle + '</div>' +
+        '</div>' +
+      '</div>' +
+      '<div style="font-weight:600;color:var(--amber)">-' + sym + sub.amount.toLocaleString('en-MY',{minimumFractionDigits:2,maximumFractionDigits:2}) + '</div>' +
+    '</div>';
+  }).join('');
+
+  var txnsHtml = txns.map(function(t) {
+    var color = t.type==='income' ? 'var(--green)' : 'var(--red)';
+    return '<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border)">' +
+      '<div style="display:flex;align-items:center;gap:10px">' +
+        '<div style="width:8px;height:8px;border-radius:50%;background:' + color + '"></div>' +
+        '<div>' +
+          '<div style="font-size:13.5px;font-weight:500">' + t.desc + '</div>' +
+          '<div style="font-size:11px;color:var(--text-muted)">' + t.cat + '</div>' +
+        '</div>' +
+      '</div>' +
+      '<div style="display:flex;align-items:center;gap:8px">' +
+        '<div style="font-weight:600;color:' + color + '">' +
+          (t.type==='income'?'+':'-') + sym + t.amount.toLocaleString('en-MY',{minimumFractionDigits:2,maximumFractionDigits:2}) +
+        '</div>' +
+        '<button class="btn btn-ghost btn-sm" onclick="editTxnFromCal(\'' + t.id + '\')" style="padding:4px 8px;font-size:11px">Edit</button>' +
+        '<button class="btn btn-danger btn-sm" onclick="deleteTxnFromCal(\'' + t.id + '\',\'' + dateStr + '\')" style="padding:4px 8px;font-size:11px">✕</button>' +
+      '</div>' +
+    '</div>';
+  }).join('');
+
+  var combined = subsHtml + txnsHtml;
+  el.innerHTML = combined || '<div style="text-align:center;color:var(--text-muted);padding:20px;font-size:13px">No transactions on this day</div>';
 }
 
 window.editTxnFromCal = function(id) {

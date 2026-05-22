@@ -1113,3 +1113,18 @@ td.td-mono { font-family: 'DM Mono', monospace; font-size: 13px; }
   #page-transactions .data-table { border: none !important; background: transparent !important; }
   #page-transactions .data-table td { border: none !important; }
 }
+
+/* ── Subscription dot on calendar ─────────────────── */
+.cal-dot-sub {
+  background: rgba(251, 191, 36, 0.15);
+  color: var(--amber, #f59e0b);
+  font-size: 9px;
+  font-weight: 600;
+  border-radius: 4px;
+  padding: 1px 4px;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  border: 1px solid rgba(251,191,36,0.3);
+}
