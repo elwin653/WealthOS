@@ -1151,3 +1151,10 @@ td.td-mono { font-family: 'DM Mono', monospace; font-size: 13px; }
     border-right: none !important;
   }
 }
+
+/* ── Investments: hide table header on mobile ─── */
+@media (max-width: 900px) {
+  #page-investments .data-table thead { display: none !important; }
+  #page-investments .data-table { border: none !important; background: transparent !important; }
+  #page-investments .data-table td { border: none !important; }
+}

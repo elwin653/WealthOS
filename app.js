@@ -357,7 +357,9 @@ function renderDashboard() {
 
   var thisMonthTxns = getThisMonthTxns();
   var realIncomeTxns = thisMonthTxns.filter(function(t){ return t.type==='income' && t.desc!=='Opening Balance'; });
-  var monthlyIncomeDisplay = realIncomeTxns.length > 0 ? getTotalIncome(realIncomeTxns) : (state.monthlyIncome || 0);
+  // Always add salary setting + income transactions (salary is fixed base, transactions are additional)
+  var txnIncome = getTotalIncome(realIncomeTxns);
+  var monthlyIncomeDisplay = (state.monthlyIncome || 0) + txnIncome;
   var monthlyExpenseDisplay = thisMonthTxns.filter(function(t){ return t.type==='expense'; }).reduce(function(s,t){ return s+t.amount; }, 0);
 
   // Hero card
@@ -593,55 +595,73 @@ function renderInvestments() {
   }
   empty.style.display = 'none';
 
-  tbody.innerHTML = state.investments.map(i => {
-    const val = i.qty * i.currentPrice;
-    const cost = i.qty * i.buyPrice;
-    const pnl = val - cost;
-    const pnlPct = cost ? (pnl / cost * 100) : 0;
-    const col = TYPE_COLORS[i.type] || '#8a9dc0';
-    const iSym = invSym(i);
-    const iCurr = i.invCurrency || state.currency;
-    const priceDecimals = i.currentPrice < 1 ? 4 : 2;
-    return `
-      <tr>
-        <td class="td-primary">
-          <div style="display:flex;align-items:center;gap:6px">
-            <span class="type-dot" style="background:${col}"></span>
-            <div>
-              <div>${i.name}</div>
-              <div style="font-size:10px;color:var(--text-muted)">${iCurr}</div>
-            </div>
-          </div>
-        </td>
-        <td><span class="badge badge-blue">${i.type.toUpperCase()}</span></td>
-        <td class="td-mono">${i.qty}</td>
-        <td class="td-mono">${fmtInv(i.buyPrice, iCurr, priceDecimals)}</td>
-        <td>
-          <div style="display:flex;align-items:center;gap:6px">
-            <span class="td-mono">${fmtInv(i.currentPrice, iCurr, priceDecimals)}</span>
-            ${i.lastUpdated ? '<span class="live-dot" title="Live price"></span>' : ''}
-          </div>
-          ${i.lastUpdated ? '<div style="font-size:10px;color:var(--text-muted);margin-top:2px">Live · ' + new Date(i.lastUpdated).toLocaleTimeString('en-MY',{hour:'2-digit',minute:'2-digit'}) + '</div>' : '<div style="font-size:10px;color:var(--text-muted);margin-top:2px">Manual — <span style=\"cursor:pointer;text-decoration:underline\" onclick=\"openPriceEdit(\'' + i.id + '\')\">Edit</span></div>'}
-        </td>
-        <td class="td-mono td-primary">${fmtInv(val, iCurr)}</td>
-        <td>
-          <span class="${pnl>=0?'pos':'neg'} mono" style="font-size:12px;font-weight:600">
-            ${pnl>=0?'+':''}${fmtInv(pnl, iCurr)}<br>
-            <span style="font-size:10px;opacity:0.8">${pnlPct>=0?'+':''}${pnlPct.toFixed(2)}%</span>
-          </span>
-        </td>
-        <td>
-          <div style="display:flex;gap:4px">
-            <button class="btn btn-ghost btn-sm btn-icon" onclick="editInvestment('${i.id}')">
-              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" style="width:13px;height:13px"><path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10"/></svg>
-            </button>
-            <button class="btn btn-danger btn-sm btn-icon" onclick="deleteInvestment('${i.id}')">
-              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" style="width:13px;height:13px"><path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"/></svg>
-            </button>
-          </div>
-        </td>
-      </tr>
-    `;
+  var isMobile = window.innerWidth <= 900;
+  tbody.innerHTML = state.investments.map(function(i) {
+    var val = i.qty * i.currentPrice;
+    var cost = i.qty * i.buyPrice;
+    var pnl = val - cost;
+    var pnlPct = cost ? (pnl / cost * 100) : 0;
+    var col = TYPE_COLORS[i.type] || '#8a9dc0';
+    var iCurr = i.invCurrency || state.currency;
+    var priceDecimals = i.currentPrice < 1 ? 4 : 2;
+    var pnlColor = pnl >= 0 ? 'var(--green)' : 'var(--red)';
+    var pnlSign = pnl >= 0 ? '+' : '';
+    var liveTime = i.lastUpdated ? new Date(i.lastUpdated).toLocaleTimeString('en-MY',{hour:'2-digit',minute:'2-digit'}) : '';
+
+    if (isMobile) {
+      // Mobile card layout
+      return '<tr><td colspan="8" style="padding:0;border:none">' +
+        '<div style="padding:14px 4px;border-bottom:1px solid var(--border)">' +
+          '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">' +
+            '<div style="display:flex;align-items:center;gap:10px">' +
+              '<div style="width:10px;height:10px;border-radius:50%;background:' + col + ';flex-shrink:0"></div>' +
+              '<div>' +
+                '<div style="font-size:15px;font-weight:700">' + i.name + '</div>' +
+                '<div style="font-size:11px;color:var(--text-muted)">' + i.type.toUpperCase() + ' · ' + iCurr + ' · Qty: ' + i.qty + '</div>' +
+              '</div>' +
+            '</div>' +
+            '<div style="display:flex;gap:6px">' +
+              '<button class="btn btn-ghost btn-sm btn-icon" onclick="editInvestment(\'' + i.id + '\')" style="padding:6px"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" style="width:14px;height:14px"><path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931z"/></svg></button>' +
+              '<button class="btn btn-danger btn-sm btn-icon" onclick="deleteInvestment(\'' + i.id + '\')" style="padding:6px"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" style="width:14px;height:14px"><path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"/></svg></button>' +
+            '</div>' +
+          '</div>' +
+          '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">' +
+            '<div style="background:var(--bg-elevated);border-radius:8px;padding:8px">' +
+              '<div style="font-size:10px;color:var(--text-muted);margin-bottom:2px">Buy Price</div>' +
+              '<div style="font-size:12px;font-weight:600">' + fmtInv(i.buyPrice, iCurr, priceDecimals) + '</div>' +
+            '</div>' +
+            '<div style="background:var(--bg-elevated);border-radius:8px;padding:8px">' +
+              '<div style="font-size:10px;color:var(--text-muted);margin-bottom:2px">Current' + (liveTime ? ' · ' + liveTime : '') + '</div>' +
+              '<div style="font-size:12px;font-weight:600">' + fmtInv(i.currentPrice, iCurr, priceDecimals) + (i.lastUpdated ? ' <span style="color:var(--green);font-size:8px">●</span>' : '') + '</div>' +
+            '</div>' +
+            '<div style="background:var(--bg-elevated);border-radius:8px;padding:8px">' +
+              '<div style="font-size:10px;color:var(--text-muted);margin-bottom:2px">Value</div>' +
+              '<div style="font-size:12px;font-weight:600">' + fmtInv(val, iCurr) + '</div>' +
+            '</div>' +
+          '</div>' +
+          '<div style="margin-top:8px;padding:8px 10px;background:' + (pnl>=0?'rgba(52,211,153,0.08)':'rgba(248,113,113,0.08)') + ';border-radius:8px;display:flex;justify-content:space-between;align-items:center">' +
+            '<span style="font-size:11px;color:var(--text-muted)">Unrealised P&L</span>' +
+            '<span style="font-weight:700;color:' + pnlColor + '">' + pnlSign + fmtInv(pnl, iCurr) + ' (' + pnlSign + pnlPct.toFixed(2) + '%)</span>' +
+          '</div>' +
+        '</div>' +
+      '</td></tr>';
+    }
+
+    // Desktop table row
+    return '<tr>' +
+      '<td class="td-primary"><div style="display:flex;align-items:center;gap:6px"><span class="type-dot" style="background:' + col + '"></span><div><div>' + i.name + '</div><div style="font-size:10px;color:var(--text-muted)">' + iCurr + '</div></div></div></td>' +
+      '<td><span class="badge badge-blue">' + i.type.toUpperCase() + '</span></td>' +
+      '<td class="td-mono">' + i.qty + '</td>' +
+      '<td class="td-mono">' + fmtInv(i.buyPrice, iCurr, priceDecimals) + '</td>' +
+      '<td><div style="display:flex;align-items:center;gap:6px"><span class="td-mono">' + fmtInv(i.currentPrice, iCurr, priceDecimals) + '</span>' + (i.lastUpdated ? '<span class="live-dot"></span>' : '') + '</div>' +
+        (i.lastUpdated ? '<div style="font-size:10px;color:var(--text-muted);margin-top:2px">Live · ' + liveTime + '</div>' : '<div style="font-size:10px;color:var(--text-muted);margin-top:2px">Manual</div>') + '</td>' +
+      '<td class="td-mono td-primary">' + fmtInv(val, iCurr) + '</td>' +
+      '<td><span class="' + (pnl>=0?'pos':'neg') + ' mono" style="font-size:12px;font-weight:600">' + pnlSign + fmtInv(pnl, iCurr) + '<br><span style="font-size:10px;opacity:0.8">' + pnlSign + pnlPct.toFixed(2) + '%</span></span></td>' +
+      '<td><div style="display:flex;gap:4px">' +
+        '<button class="btn btn-ghost btn-sm btn-icon" onclick="editInvestment(\'' + i.id + '\')"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" style="width:13px;height:13px"><path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931z"/></svg></button>' +
+        '<button class="btn btn-danger btn-sm btn-icon" onclick="deleteInvestment(\'' + i.id + '\')"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" style="width:13px;height:13px"><path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"/></svg></button>' +
+      '</div></td>' +
+    '</tr>';
   }).join('');
 }
 
