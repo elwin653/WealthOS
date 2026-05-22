@@ -2879,31 +2879,37 @@ window.sendAiMessage = async function() {
       buildFinancialContext();
 
     // Try multiple model names in case one is unavailable
-    // Pollinations AI — completely free, no API key, no signup needed
-    // Uses OpenAI-compatible endpoint with free models
+    // Groq AI — free tier, no credit card, 14,400 req/day
     var reply = null;
     var lastErr = null;
+    var apiKey = state.geminiApiKey || '';
 
-    var pollinationsModels = ['openai', 'mistral', 'llama'];
-    for (var mi = 0; mi < pollinationsModels.length; mi++) {
+    if (!apiKey) {
+      throw new Error('Add your free Groq API key in Settings → AI Advisor first');
+    }
+
+    var groqModels = ['llama-3.1-8b-instant', 'mixtral-8x7b-32768', 'gemma2-9b-it'];
+    var messages = [{ role: 'system', content: systemPrompt }];
+    aiHistory.forEach(function(m) {
+      messages.push({
+        role: m.role === 'model' ? 'assistant' : m.role,
+        content: m.parts[0].text
+      });
+    });
+
+    for (var mi = 0; mi < groqModels.length; mi++) {
       try {
-        var response = await fetch('https://text.pollinations.ai/openai', {
+        var response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + apiKey
+          },
           body: JSON.stringify({
-            model: pollinationsModels[mi],
-            messages: [
-              { role: 'system', content: systemPrompt },
-              ...aiHistory.map(function(m) {
-                return {
-                  role: m.role === 'model' ? 'assistant' : m.role,
-                  content: m.parts[0].text
-                };
-              })
-            ],
+            model: groqModels[mi],
+            messages: messages,
             max_tokens: 800,
-            temperature: 0.7,
-            private: true
+            temperature: 0.7
           }),
           signal: AbortSignal.timeout(30000)
         });
@@ -2911,6 +2917,8 @@ window.sendAiMessage = async function() {
         if (!response.ok) {
           var errData = await response.json().catch(function(){ return {}; });
           lastErr = (errData.error && errData.error.message) || ('Error ' + response.status);
+          if (response.status === 401) throw new Error('Invalid API key — check your Groq key in Settings');
+          if (response.status === 429) { lastErr = 'Rate limit — trying next model...'; continue; }
           continue;
         }
 
@@ -2918,6 +2926,8 @@ window.sendAiMessage = async function() {
         reply = data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content;
         if (reply) break;
       } catch(e) {
+        if (e.message && e.message.includes('Invalid API key')) throw e;
+        if (e.message && e.message.includes('Add your free')) throw e;
         lastErr = e.message || 'Connection error';
       }
     }
