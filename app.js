@@ -55,7 +55,8 @@ let state = {
   budgetLimit: 0,
   language: 'en',
   navTabs: ['dashboard', 'wallet', 'transactions', 'investments'],
-  accounts: []
+  accounts: [],
+  recurringIncome: []
 };
 
 // ── Constants ───────────────────────────────────────────
@@ -143,6 +144,7 @@ function load() {
       if (!Array.isArray(state.subscriptions)) state.subscriptions = [];
       if (!Array.isArray(state.navTabs) || state.navTabs.length === 0) state.navTabs = ['dashboard','wallet','transactions','investments'];
       if (!Array.isArray(state.accounts)) state.accounts = [];
+      if (!Array.isArray(state.recurringIncome)) state.recurringIncome = [];
       if (!Array.isArray(state.networthHistory)) state.networthHistory = [];
       // If onboardingDone somehow missing but they have real data, restore it
       if (!state.onboardingDone && (state.transactions.length || state.investments.length)) {
@@ -1769,7 +1771,8 @@ function confirmReset() {
       onboardingDone: false, userName: '', monthlyIncome: 0, budgetLimit: 0,
       weekStart: 'monday', language: 'en',
       navTabs: ['dashboard', 'wallet', 'transactions', 'investments'],
-      accounts: []
+      accounts: [],
+      recurringIncome: []
     };
 
     // Destroy all chart instances
@@ -2307,6 +2310,7 @@ function init() {
   checkOnboarding();
   setAutoRefresh(5);
   processSubscriptionCharges();
+  processRecurringIncome();
   const snapshotKey = 'wealthos_last_snap';
   const lastSnap = localStorage.getItem(snapshotKey);
   const today = new Date().toISOString().slice(0,7);
@@ -2722,6 +2726,7 @@ function processSubscriptionCharges() {
 // ═══════════════════════════════════════════════════════════
 window.renderSettingsPage = function() {
   if (window.renderNavSettings) window.renderNavSettings();
+  if (window.renderRecurringIncome) window.renderRecurringIncome();
   var themeMode = state.themeMode || 'dark';
   var lang = state.language || 'en';
 
@@ -3545,4 +3550,105 @@ window.openManualPriceEdit = function(id) {
   renderInvestments();
   renderAll();
   toast('✓ Price updated for ' + inv.name, 'success');
+};
+
+// ═══════════════════════════════════════════════════════════
+// FEATURE: Recurring Income (salary, rental, etc.)
+// ═══════════════════════════════════════════════════════════
+
+function processRecurringIncome() {
+  if (!Array.isArray(state.recurringIncome) || !state.recurringIncome.length) return;
+
+  var today = new Date();
+  var todayDay = today.getDate();
+  var monthKey = today.toISOString().slice(0, 7); // e.g. "2026-05"
+  var changed = false;
+
+  state.recurringIncome.forEach(function(ri) {
+    if (!ri || !ri.amount || !ri.dayOfMonth) return;
+
+    // Only charge if today >= the scheduled day this month
+    if (todayDay < ri.dayOfMonth) return;
+
+    // Check if already charged this month (look for transaction with same recurringId and this month)
+    var alreadyCharged = state.transactions.some(function(t) {
+      return t.recurringId === ri.id && t.date && t.date.slice(0, 7) === monthKey;
+    });
+
+    if (!alreadyCharged) {
+      // Create the income transaction
+      var txDate = monthKey + '-' + String(ri.dayOfMonth).padStart(2, '0');
+      state.transactions.push({
+        id: uid(),
+        type: 'income',
+        desc: ri.name,
+        amount: ri.amount,
+        cat: ri.cat || 'Salary',
+        date: txDate,
+        createdAt: new Date().toISOString(),
+        recurringId: ri.id
+      });
+      changed = true;
+      toast('💰 ' + ri.name + ' — ' + curr() + ri.amount.toLocaleString('en-MY', {minimumFractionDigits:2}) + ' added', 'success');
+    }
+  });
+
+  if (changed) {
+    save();
+    renderAll();
+  }
+}
+
+// Render recurring income list in settings
+window.renderRecurringIncome = function() {
+  var el = document.getElementById('recurring-income-list');
+  if (!el) return;
+  var sym = curr();
+  var items = state.recurringIncome || [];
+
+  if (!items.length) {
+    el.innerHTML = '<div style="font-size:12px;color:var(--text-muted);padding:8px 0">No recurring income set up yet.</div>';
+    return;
+  }
+
+  el.innerHTML = items.map(function(ri) {
+    return '<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border)">' +
+      '<div>' +
+        '<div style="font-size:13.5px;font-weight:600">' + ri.name + '</div>' +
+        '<div style="font-size:11px;color:var(--text-muted)">' + sym + ri.amount.toLocaleString('en-MY',{minimumFractionDigits:2}) + ' · Every month on day ' + ri.dayOfMonth + ' · ' + (ri.cat||'Salary') + '</div>' +
+      '</div>' +
+      '<button onclick="deleteRecurringIncome(\'' + ri.id + '\')" style="background:none;border:none;cursor:pointer;color:var(--red);font-size:18px;padding:4px">✕</button>' +
+    '</div>';
+  }).join('');
+};
+
+window.addRecurringIncome = function() {
+  var name = document.getElementById('ri-name').value.trim();
+  var amount = parseFloat(document.getElementById('ri-amount').value);
+  var day = parseInt(document.getElementById('ri-day').value);
+  var cat = document.getElementById('ri-cat').value;
+
+  if (!name) { toast('Please enter a name', 'error'); return; }
+  if (!amount || amount <= 0) { toast('Please enter a valid amount', 'error'); return; }
+  if (!day || day < 1 || day > 28) { toast('Day must be between 1 and 28', 'error'); return; }
+
+  if (!Array.isArray(state.recurringIncome)) state.recurringIncome = [];
+  state.recurringIncome.push({ id: uid(), name: name, amount: amount, dayOfMonth: day, cat: cat });
+  save();
+  processRecurringIncome();
+
+  // Clear inputs
+  document.getElementById('ri-name').value = '';
+  document.getElementById('ri-amount').value = '';
+  document.getElementById('ri-day').value = '1';
+
+  window.renderRecurringIncome();
+  toast('✓ Recurring income added', 'success');
+};
+
+window.deleteRecurringIncome = function(id) {
+  state.recurringIncome = (state.recurringIncome || []).filter(function(r){ return r.id !== id; });
+  save();
+  window.renderRecurringIncome();
+  toast('Recurring income removed', 'info');
 };
