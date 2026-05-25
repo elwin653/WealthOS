@@ -164,8 +164,17 @@
 
     <!-- ═══════════════════ DASHBOARD ═══════════════════ -->
     <div class="page active" id="page-dashboard">
+      <!-- AI Pill -->
+      <div style="padding:14px 20px 0;display:flex;justify-content:center">
+        <button onclick="navigate('ai-advisor')" style="display:flex;align-items:center;gap:8px;background:linear-gradient(135deg,rgba(96,165,250,0.12),rgba(167,139,250,0.12));border:1.5px solid rgba(96,165,250,0.3);border-radius:99px;padding:8px 22px;cursor:pointer;font-family:inherit;transition:all 0.2s;color:inherit">
+          <span style="font-size:15px">💬</span>
+          <span style="font-size:13px;font-weight:600;background:linear-gradient(90deg,#60a5fa,#a78bfa);-webkit-background-clip:text;-webkit-text-fill-color:transparent">Ask AI Advisor</span>
+          <span style="font-size:9px;color:var(--text-muted);-webkit-text-fill-color:unset">✦ AI</span>
+        </button>
+      </div>
+
       <!-- Professional Dashboard Header -->
-      <div style="padding:20px 20px 0;display:flex;align-items:center;justify-content:space-between">
+      <div style="padding:12px 20px 0;display:flex;align-items:center;justify-content:space-between">
         <div>
           <div data-i18n="overview" style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:2px">Financial Overview</div>
           <div style="font-size:22px;font-weight:800;color:var(--text-primary);font-family:'Syne',sans-serif" id="dash-title">Overview</div>
