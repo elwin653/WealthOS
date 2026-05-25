@@ -457,6 +457,16 @@ td.td-mono { font-family: 'DM Mono', monospace; font-size: 13px; }
   display: flex; flex-direction: column; gap: 8px;
   z-index: 9999;
 }
+@media (max-width: 900px) {
+  #toast-container {
+    bottom: auto;
+    top: 16px;
+    right: 12px;
+    left: 12px;
+    align-items: center;
+  }
+  .toast { min-width: unset; width: 100%; max-width: 100%; justify-content: center; }
+}
 
 .toast {
   background: var(--bg-elevated);

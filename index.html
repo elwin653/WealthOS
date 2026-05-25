@@ -245,10 +245,9 @@
         </div>
         <div class="card" style="margin:0">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
-            <div class="chart-label" style="margin-bottom:0;font-size:11px" data-i18n="insights">Insights</div>
-            <span class="badge badge-green" style="font-size:10px">AI</span>
+            <div class="chart-label" style="margin-bottom:0;font-size:11px">📅 Upcoming</div>
           </div>
-          <div id="dash-insights"></div>
+          <div id="dash-upcoming"></div>
         </div>
       </div>
     </div>
@@ -991,6 +990,12 @@
       <div class="form-group">
         <label class="form-label">Date</label>
         <input type="date" class="form-input" id="txn-date">
+      </div>
+      <div class="form-group" id="txn-wallet-group">
+        <label class="form-label">Wallet / Account <span style="color:var(--text-muted);font-weight:400;text-transform:none">(optional)</span></label>
+        <select class="form-select" id="txn-wallet">
+          <option value="">No specific wallet</option>
+        </select>
       </div>
     </div>
     <div style="display:flex;gap:10px;margin-top:8px">
