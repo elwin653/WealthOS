@@ -705,9 +705,12 @@ function renderInvestments() {
               '<div style="font-size:10px;color:var(--text-muted);margin-bottom:2px">Buy Price</div>' +
               '<div style="font-size:12px;font-weight:600">' + fmtInv(i.buyPrice, iCurr, priceDecimals) + '</div>' +
             '</div>' +
-            '<div style="background:var(--bg-elevated);border-radius:8px;padding:8px">' +
+            '<div style="background:' + (i.fetchFailed ? 'rgba(248,113,113,0.08)' : 'var(--bg-elevated)') + ';border-radius:8px;padding:8px;border:' + (i.fetchFailed ? '1px solid rgba(248,113,113,0.3)' : 'none') + '">' +
               '<div style="font-size:10px;color:var(--text-muted);margin-bottom:2px">Current' + (liveTime ? ' · ' + liveTime : '') + '</div>' +
-              '<div style="font-size:12px;font-weight:600">' + fmtInv(i.currentPrice, iCurr, priceDecimals) + (i.lastUpdated ? ' <span style="color:var(--green);font-size:8px">●</span>' : '') + '</div>' +
+              (i.fetchFailed
+                ? '<div style="font-size:11px;color:var(--red);font-weight:600">⚠️ Unavailable</div>' +
+                  '<button onclick="openManualPriceEdit(\'' + i.id + '\')" style="margin-top:4px;font-size:10px;padding:2px 6px;border-radius:4px;background:var(--red);color:white;border:none;cursor:pointer;font-family:inherit">Enter manually</button>'
+                : '<div style="font-size:12px;font-weight:600">' + fmtInv(i.currentPrice, iCurr, priceDecimals) + (i.lastUpdated ? ' <span style="color:var(--green);font-size:8px">●</span>' : '') + '</div>') +
             '</div>' +
             '<div style="background:var(--bg-elevated);border-radius:8px;padding:8px">' +
               '<div style="font-size:10px;color:var(--text-muted);margin-bottom:2px">Value</div>' +
@@ -2168,12 +2171,15 @@ async function refreshAllPrices() {
   if (btn) { btn.disabled = false; btn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" style="width:14px;height:14px"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99"/></svg> Refresh Prices`; }
 
   if (updated > 0 && failed.length === 0) {
-    toast(`✅ All ${updated} prices updated!`, 'success');
-  } else if (updated > 0) {
-    toast(`Updated ${updated} · Failed: ${failed.join(', ')}`, 'info');
+    toast('✅ All ' + updated + ' prices updated!', 'success');
+  } else if (updated > 0 && failed.length > 0) {
+    toast('Updated ' + updated + ' · Could not fetch: ' + failed.join(', '), 'info');
+    // Show a clear warning for failed ones
+    showPriceFetchWarning(failed);
   } else {
-    toast(`Could not fetch prices. Check ticker symbols.`, 'error');
-    if (statusEl) statusEl.textContent = 'Update failed';
+    toast('Could not fetch any prices — please update prices manually.', 'error');
+    if (statusEl) statusEl.textContent = 'Update failed — manual entry needed';
+    showPriceFetchWarning(failed);
   }
 }
 
@@ -3500,4 +3506,43 @@ window.renderAiAdvisor = function() {
         '<div class="ai-msg-bubble">Hi! I\'m your AI financial advisor. I have access to all your WealthOS data — your transactions, investments, goals, and subscriptions.<br><br>Ask me anything about your finances and I\'ll give you personalised insights and advice.</div>' +
       '</div>';
   }
+};
+
+// ── Price Fetch Warning ───────────────────────────────────
+function showPriceFetchWarning(failedNames) {
+  if (!failedNames || !failedNames.length) return;
+
+  // Find investments that failed and mark them visually
+  failedNames.forEach(function(name) {
+    var inv = state.investments.find(function(i){ return i.name === name; });
+    if (!inv) return;
+
+    // Remove lastUpdated so it shows as manual
+    inv.fetchFailed = true;
+  });
+
+  // Show a toast with clear instruction
+  setTimeout(function() {
+    toast('⚠️ ' + failedNames.join(', ') + ' — price unavailable. Tap the investment to enter price manually.', 'error', 6000);
+  }, 500);
+
+  // Re-render to show the failed state
+  renderInvestments();
+}
+
+window.openManualPriceEdit = function(id) {
+  var inv = state.investments.find(function(i){ return i.id === id; });
+  if (!inv) return;
+  var sym = CURR_SYMBOL[inv.invCurrency] || inv.invCurrency || '$';
+  var newPrice = prompt('Enter current price for ' + inv.name + ' (' + sym + '):', inv.currentPrice || '');
+  if (newPrice === null) return; // cancelled
+  var parsed = parseFloat(newPrice);
+  if (isNaN(parsed) || parsed <= 0) { toast('Invalid price', 'error'); return; }
+  inv.currentPrice = parsed;
+  inv.lastUpdated = null; // mark as manual
+  inv.fetchFailed = false;
+  save();
+  renderInvestments();
+  renderAll();
+  toast('✓ Price updated for ' + inv.name, 'success');
 };
