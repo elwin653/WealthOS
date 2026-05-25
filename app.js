@@ -3118,7 +3118,8 @@ window.sendAiMessage = async function() {
     // Groq AI — free tier, no credit card, 14,400 req/day
     var reply = null;
     var lastErr = null;
-    var apiKey = state.geminiApiKey || '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';
+    // API key is handled by Cloudflare Worker proxy — no key needed on client
+    var apiKey = 'proxy';
 
     var groqModels = ['llama3-8b-8192', 'llama-3.1-8b-instant', 'gemma2-9b-it', 'mixtral-8x7b-32768'];
     // Build messages from history EXCLUDING the last user message
@@ -3139,12 +3140,9 @@ window.sendAiMessage = async function() {
 
     for (var mi = 0; mi < groqModels.length; mi++) {
       try {
-        var response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        var response = await fetch('https://wealthai.elwin653.workers.dev/', {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer ' + apiKey
-          },
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             model: groqModels[mi],
             messages: messages,
@@ -3192,6 +3190,13 @@ window.sendAiMessage = async function() {
 
   } catch(e) {
     var typingEl = document.getElementById(typingId);
+    if (e.message === 'NO_KEY') {
+      // Show friendly setup screen instead of error
+      if (typingEl) typingEl.remove();
+      aiHistory.pop();
+      showAiKeySetup();
+      return;
+    }
     if (typingEl) {
       typingEl.querySelector('.ai-msg-bubble').innerHTML = '⚠️ ' + (e.message || 'Connection error. Check your API key and internet.');
     }
@@ -3429,4 +3434,75 @@ window.toggleNavTab = function(pageId) {
   buildMobileNav();
   window.renderNavSettings();
   toast('Navigation updated ✓', 'success');
+};
+
+// ── AI Advisor: First-time key setup screen ──────────────
+function showAiKeySetup() {
+  var messages = document.getElementById('ai-messages');
+  var suggestions = document.getElementById('ai-suggestions');
+  if (suggestions) suggestions.style.display = 'none';
+
+  if (messages) messages.innerHTML =
+    '<div style="padding:24px;text-align:center">' +
+      '<div style="font-size:48px;margin-bottom:16px">✨</div>' +
+      '<div style="font-size:18px;font-weight:700;margin-bottom:8px">Set up AI Advisor</div>' +
+      '<div style="font-size:13.5px;color:var(--text-muted);line-height:1.7;margin-bottom:24px">' +
+        'AI Advisor uses Groq — a free AI service.<br>Get your free key in under 2 minutes:' +
+      '</div>' +
+      '<div style="text-align:left;background:var(--bg-elevated);border-radius:14px;padding:18px;margin-bottom:20px">' +
+        '<div style="display:flex;gap:12px;align-items:flex-start;margin-bottom:12px">' +
+          '<div style="width:24px;height:24px;border-radius:50%;background:var(--blue);color:white;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0">1</div>' +
+          '<div style="font-size:13px">Go to <strong>console.groq.com</strong> and sign up free (no credit card)</div>' +
+        '</div>' +
+        '<div style="display:flex;gap:12px;align-items:flex-start;margin-bottom:12px">' +
+          '<div style="width:24px;height:24px;border-radius:50%;background:var(--blue);color:white;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0">2</div>' +
+          '<div style="font-size:13px">Click <strong>API Keys</strong> → <strong>Create API Key</strong> → copy it</div>' +
+        '</div>' +
+        '<div style="display:flex;gap:12px;align-items:flex-start">' +
+          '<div style="width:24px;height:24px;border-radius:50%;background:var(--blue);color:white;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0">3</div>' +
+          '<div style="font-size:13px">Paste it below and tap Save — done! 🎉</div>' +
+        '</div>' +
+      '</div>' +
+      '<div style="display:flex;gap:8px;margin-bottom:12px">' +
+        '<input type="password" id="ai-inline-key" placeholder="Paste your Groq key here (gsk_...)" ' +
+          'style="flex:1;padding:11px 14px;border-radius:10px;border:1.5px solid var(--border);background:var(--bg-elevated);color:var(--text-primary);font-family:inherit;font-size:13.5px;outline:none">' +
+        '<button onclick="saveAiInlineKey()" ' +
+          'style="background:var(--blue);border:none;border-radius:10px;padding:11px 18px;color:white;font-weight:700;font-size:13.5px;cursor:pointer;font-family:inherit;white-space:nowrap">' +
+          'Save' +
+        '</button>' +
+      '</div>' +
+      '<div style="font-size:11px;color:var(--text-muted)">Your key is stored only on your device. Free tier: 14,400 requests/day.</div>' +
+    '</div>';
+}
+
+window.saveAiInlineKey = function() {
+  var keyEl = document.getElementById('ai-inline-key');
+  var key = keyEl ? keyEl.value.trim() : '';
+  if (!key || key.length < 20) { toast('Please paste a valid Groq key', 'error'); return; }
+  state.geminiApiKey = key;
+  save();
+  toast('✓ API key saved! You can now use AI Advisor.', 'success');
+  // Re-render the AI page with the welcome message
+  window.renderAiAdvisor();
+};
+
+window.renderAiAdvisor = function() {
+  var sugg = document.getElementById('ai-suggestions');
+  var messages = document.getElementById('ai-messages');
+
+  if (!state.geminiApiKey) {
+    // No key — show setup screen
+    showAiKeySetup();
+    return;
+  }
+
+  // Has key — show normal chat interface
+  if (sugg) sugg.style.display = 'flex';
+  if (messages && messages.children.length === 0) {
+    messages.innerHTML =
+      '<div class="ai-msg ai-msg-assistant">' +
+        '<div class="ai-msg-avatar">✨</div>' +
+        '<div class="ai-msg-bubble">Hi! I\'m your AI financial advisor powered by Groq AI. I have access to all your WealthOS data — your transactions, investments, goals, and subscriptions.<br><br>Ask me anything about your finances and I\'ll give you personalised insights and advice.</div>' +
+      '</div>';
+  }
 };
