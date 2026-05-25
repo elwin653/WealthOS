@@ -579,23 +579,60 @@ function renderNetworthChart() {
 
 // ── Expense Donut ────────────────────────────────────────
 function renderExpenseDonut() {
-  const ctx = document.getElementById('chart-expense-donut');
-  if (!ctx) return;
-  destroyChart('expDonut');
-  const mtxns = getThisMonthTxns().filter(t => t.type === 'expense');
-  if (!mtxns.length) { ctx.style.display='none'; return; }
-  ctx.style.display='block';
-  const cats = {};
-  mtxns.forEach(t => cats[t.cat] = (cats[t.cat]||0) + t.amount);
-  const keys = Object.keys(cats);
-  state.charts.expDonut = new Chart(ctx, {
-    type: 'doughnut',
-    data: {
-      labels: keys,
-      datasets: [{ data: keys.map(k => cats[k]), backgroundColor: keys.map(k => CAT_COLORS[k] || '#8a9dc0'), borderWidth: 0, hoverOffset: 6 }]
-    },
-    options: { ...chartDefaults(), cutout: '68%', plugins: { legend: { position: 'bottom', labels: { color: '#8a9dc0', font: { size: 11 }, padding: 12 } } } }
-  });
+  // Replace pie/donut with a clean category breakdown bar list
+  var container = document.getElementById('chart-expense-donut');
+  if (!container) return;
+
+  var mtxns = getThisMonthTxns().filter(function(t){ return t.type === 'expense'; });
+  var sym = curr();
+
+  if (!mtxns.length) {
+    container.style.display = 'none';
+    return;
+  }
+  container.style.display = 'block';
+
+  // Sum by category
+  var cats = {};
+  mtxns.forEach(function(t){ cats[t.cat] = (cats[t.cat]||0) + t.amount; });
+  var total = Object.values(cats).reduce(function(s,v){ return s+v; }, 0);
+
+  // Sort by amount descending
+  var sorted = Object.entries(cats).sort(function(a,b){ return b[1]-a[1]; });
+
+  // Render as styled bar list (no Chart.js needed)
+  var html = sorted.map(function(entry) {
+    var cat = entry[0], amt = entry[1];
+    var pct = total > 0 ? Math.round((amt/total)*100) : 0;
+    var color = CAT_COLORS[cat] || '#8a9dc0';
+    var icon = CAT_ICONS[cat] || '📋';
+    return '<div style="margin-bottom:12px">' +
+      '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px">' +
+        '<div style="display:flex;align-items:center;gap:7px">' +
+          '<span style="font-size:14px">' + icon + '</span>' +
+          '<span style="font-size:13px;font-weight:600;color:var(--text-primary)">' + cat + '</span>' +
+        '</div>' +
+        '<div style="display:flex;align-items:center;gap:8px">' +
+          '<span style="font-size:12px;color:var(--text-muted)">' + pct + '%</span>' +
+          '<span style="font-size:13px;font-weight:700;color:var(--text-primary)">' + sym + amt.toLocaleString('en-MY',{minimumFractionDigits:2,maximumFractionDigits:2}) + '</span>' +
+        '</div>' +
+      '</div>' +
+      '<div style="height:7px;background:var(--bg-elevated);border-radius:99px;overflow:hidden">' +
+        '<div style="height:100%;width:' + pct + '%;background:' + color + ';border-radius:99px;transition:width 0.6s ease"></div>' +
+      '</div>' +
+    '</div>';
+  }).join('');
+
+  // Replace canvas with a div if not already done
+  if (container.tagName === 'CANVAS') {
+    var div = document.createElement('div');
+    div.id = 'chart-expense-donut';
+    div.style.cssText = container.style.cssText;
+    container.parentNode.replaceChild(div, container);
+    div.innerHTML = html;
+  } else {
+    container.innerHTML = html;
+  }
 }
 
 // ── Investments ──────────────────────────────────────────
