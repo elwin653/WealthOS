@@ -586,11 +586,11 @@ function renderExpenseDonut() {
   var mtxns = getThisMonthTxns().filter(function(t){ return t.type === 'expense'; });
   var sym = curr();
 
+  container.style.display = 'block';
   if (!mtxns.length) {
-    container.style.display = 'none';
+    container.innerHTML = '<div style="text-align:center;padding:20px 0;color:var(--text-muted);font-size:12px">No expenses recorded this month</div>';
     return;
   }
-  container.style.display = 'block';
 
   // Sum by category
   var cats = {};
