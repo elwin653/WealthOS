@@ -3118,11 +3118,7 @@ window.sendAiMessage = async function() {
     // Groq AI — free tier, no credit card, 14,400 req/day
     var reply = null;
     var lastErr = null;
-    var apiKey = state.geminiApiKey || '';
-
-    if (!apiKey) {
-      throw new Error('Add your free Groq API key in Settings → AI Advisor first');
-    }
+    var apiKey = state.geminiApiKey || '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';
 
     var groqModels = ['llama3-8b-8192', 'llama-3.1-8b-instant', 'gemma2-9b-it', 'mixtral-8x7b-32768'];
     // Build messages from history EXCLUDING the last user message
