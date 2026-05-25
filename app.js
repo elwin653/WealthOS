@@ -3059,11 +3059,12 @@ function buildFinancialContext() {
     }).join('; ');
 }
 
+var _aiMsgCounter = 0;
 function appendAiMessage(role, text, isStreaming) {
   var container = document.getElementById('ai-messages');
   if (!container) return;
 
-  var msgId = 'ai-msg-' + Date.now();
+  var msgId = 'ai-msg-' + (++_aiMsgCounter);
   var isUser = role === 'user';
   var avatar = isUser ? (state.userName ? state.userName[0].toUpperCase() : 'U') : '✨';
 
