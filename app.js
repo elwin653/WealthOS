@@ -3124,14 +3124,22 @@ window.sendAiMessage = async function() {
       throw new Error('Add your free Groq API key in Settings → AI Advisor first');
     }
 
-    var groqModels = ['llama3-8b-8192', 'llama3-groq-8b-8192-tool-use-preview', 'llama-3.1-8b-instant', 'gemma2-9b-it', 'mixtral-8x7b-32768'];
+    var groqModels = ['llama3-8b-8192', 'llama-3.1-8b-instant', 'gemma2-9b-it', 'mixtral-8x7b-32768'];
+    // Build messages from history EXCLUDING the last user message
+    // (we send it as the final message to avoid duplication)
+    var historyToSend = aiHistory.slice(0, -1); // all except last
+    var lastMsg = aiHistory[aiHistory.length - 1]; // current user message
     var messages = [{ role: 'system', content: systemPrompt }];
-    aiHistory.forEach(function(m) {
+    historyToSend.forEach(function(m) {
       messages.push({
         role: m.role === 'model' ? 'assistant' : m.role,
         content: m.parts[0].text
       });
     });
+    // Add current user message last
+    if (lastMsg) {
+      messages.push({ role: 'user', content: lastMsg.parts[0].text });
+    }
 
     for (var mi = 0; mi < groqModels.length; mi++) {
       try {
@@ -3175,7 +3183,13 @@ window.sendAiMessage = async function() {
     }
 
     var typingEl = document.getElementById(typingId);
-    if (typingEl) typingEl.querySelector('.ai-msg-bubble').innerHTML = escapeHtml(reply);
+    // Safety: only update if this element is an assistant bubble (never a user bubble)
+    if (typingEl && typingEl.classList.contains('ai-msg-assistant')) {
+      typingEl.querySelector('.ai-msg-bubble').innerHTML = escapeHtml(reply);
+    } else {
+      // Fallback: append a new assistant message
+      appendAiMessage('assistant', reply, false);
+    }
 
     aiHistory.push({ role: 'model', parts: [{ text: reply }] });
     if (aiHistory.length > 20) aiHistory = aiHistory.slice(-20);
