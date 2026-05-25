@@ -3489,20 +3489,13 @@ window.saveAiInlineKey = function() {
 window.renderAiAdvisor = function() {
   var sugg = document.getElementById('ai-suggestions');
   var messages = document.getElementById('ai-messages');
-
-  if (!state.geminiApiKey) {
-    // No key — show setup screen
-    showAiKeySetup();
-    return;
-  }
-
-  // Has key — show normal chat interface
+  // Proxy handles auth — always show chat directly
   if (sugg) sugg.style.display = 'flex';
   if (messages && messages.children.length === 0) {
     messages.innerHTML =
       '<div class="ai-msg ai-msg-assistant">' +
         '<div class="ai-msg-avatar">✨</div>' +
-        '<div class="ai-msg-bubble">Hi! I\'m your AI financial advisor powered by Groq AI. I have access to all your WealthOS data — your transactions, investments, goals, and subscriptions.<br><br>Ask me anything about your finances and I\'ll give you personalised insights and advice.</div>' +
+        '<div class="ai-msg-bubble">Hi! I\'m your AI financial advisor. I have access to all your WealthOS data — your transactions, investments, goals, and subscriptions.<br><br>Ask me anything about your finances and I\'ll give you personalised insights and advice.</div>' +
       '</div>';
   }
 };
