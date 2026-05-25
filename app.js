@@ -37,8 +37,8 @@ var LANG = {
 // ── State ──────────────────────────────────────────────
 let state = {
   currency: 'MYR',
-  darkMode: true,
-  themeMode: 'dark',
+  darkMode: false,
+  themeMode: 'light',
   hideNumbers: false,
   transactions: [],
   investments: [],
@@ -1245,6 +1245,18 @@ function getMonthlySubTotal() {
 }
 
 function renderSubscriptions() {
+  // Add tab toggle if not already there
+  var header = document.querySelector('#page-subscriptions .page-header');
+  if (header && !document.getElementById('sub-tab-toggle')) {
+    var tabHtml = '<div style="display:flex;gap:8px;margin:0 20px 8px;background:var(--bg-elevated);border-radius:10px;padding:4px">' +
+      '<button id="sub-tab-subs" onclick="showSubTab(\"subs\")" style="flex:1;padding:7px;border:none;border-radius:7px;background:var(--bg-card);font-family:inherit;font-size:12px;font-weight:600;cursor:pointer;color:var(--text-primary)">🔄 Subscriptions</button>' +
+      '<button id="sub-tab-income" onclick="showSubTab(\"income\")" style="flex:1;padding:7px;border:none;border-radius:7px;background:transparent;font-family:inherit;font-size:12px;font-weight:600;cursor:pointer;color:var(--text-muted)">💰 Recurring Income</button>' +
+    '</div>';
+    var tabEl = document.createElement('div');
+    tabEl.id = 'sub-tab-toggle';
+    tabEl.innerHTML = tabHtml;
+    header.after(tabEl);
+  }
   const monthly = getMonthlySubTotal();
   const yearly = monthly * 12;
   document.getElementById('sub-stats').innerHTML = [
@@ -1810,7 +1822,7 @@ function confirmReset() {
 
     // Fully reset state to defaults
     state = {
-      currency: 'MYR', darkMode: true, themeMode: 'dark', hideNumbers: false,
+      currency: 'MYR', darkMode: false, themeMode: 'light', hideNumbers: false,
       transactions: [], investments: [], goals: [], subscriptions: [], networthHistory: [],
       selectedTxnType: 'income', selectedGoalIcon: '🎯', editingGoalId: null, charts: {},
       onboardingDone: false, userName: '', monthlyIncome: 0, budgetLimit: 0,
@@ -1885,13 +1897,27 @@ function openModal(id) {
   if (id === 'add-txn-modal' && !document.getElementById('txn-edit-id').value) {
     // Populate wallet selector
     var walletSel = document.getElementById('txn-wallet');
+    var walletGroup = document.getElementById('txn-wallet-group');
     if (walletSel) {
-      var accts = state.accounts || [];
-      walletSel.innerHTML = '<option value="">No specific wallet</option>' +
-        accts.filter(function(a){ return a.type !== 'liability'; }).map(function(a) {
-          return '<option value="' + a.id + '">' + (a.icon||'') + ' ' + a.name + ' (' + curr() + (a.balance||0).toLocaleString('en-MY',{maximumFractionDigits:0}) + ')</option>';
-        }).join('');
-      walletSel.value = '';
+      var accts = (state.accounts || []).filter(function(a){ return a.type !== 'liability'; });
+      if (accts.length === 0) {
+        // No wallets — show prompt to add one
+        walletSel.innerHTML = '<option value="">No wallets added yet</option>';
+        if (walletGroup) walletGroup.innerHTML =
+          '<div style="background:rgba(96,165,250,0.08);border:1px solid rgba(96,165,250,0.2);border-radius:10px;padding:10px 12px;font-size:12px">' +
+          '💡 <strong>Tip:</strong> Add a wallet (cash, bank account) to track where your money goes. ' +
+          '<span onclick="closeModal(\"add-txn-modal\");navigate(\"wallet\");" style="color:var(--blue);cursor:pointer;text-decoration:underline">Add a wallet →</span>' +
+          '</div>';
+      } else {
+        if (walletGroup) walletGroup.innerHTML =
+          '<label class="form-label">Wallet / Account <span style="color:var(--text-muted);font-weight:400;text-transform:none">(optional)</span></label>' +
+          '<select class="form-select" id="txn-wallet">' +
+          '<option value="">No specific wallet</option>' +
+          accts.map(function(a) {
+            return '<option value="' + a.id + '">' + (a.icon||'') + ' ' + a.name + ' (' + curr() + (a.balance||0).toLocaleString('en-MY',{maximumFractionDigits:0}) + ')</option>';
+          }).join('') +
+          '</select>';
+      }
     }    document.getElementById('txn-modal-title').textContent = 'Add Transaction';
     document.getElementById('txn-desc').value = '';
     document.getElementById('txn-amount').value = '';
@@ -3767,4 +3793,26 @@ window.aiAddTransaction = function(txnData) {
   save();
   renderAll();
   toast('✓ Transaction recorded: ' + txn.desc, 'success');
+};
+
+
+window.showSubTab = function(tab) {
+  var subsContent = document.querySelector('#page-subscriptions .page-header');
+  var riSection = document.getElementById('sub-recurring-income');
+  var subsList = document.getElementById('subscriptions-list') || document.querySelector('#page-subscriptions .card');
+  var btnSubs = document.getElementById('sub-tab-subs');
+  var btnIncome = document.getElementById('sub-tab-income');
+  if (tab === 'income') {
+    if (riSection) riSection.style.display = 'block';
+    // Hide subscriptions content (header area cards)
+    document.querySelectorAll('#page-subscriptions > *:not(#sub-recurring-income):not(#sub-tab-toggle)').forEach(function(el){ el.style.display = 'none'; });
+    if (btnSubs) { btnSubs.style.background = 'transparent'; btnSubs.style.color = 'var(--text-muted)'; }
+    if (btnIncome) { btnIncome.style.background = 'var(--bg-card)'; btnIncome.style.color = 'var(--text-primary)'; }
+    if (window.renderRecurringIncome) window.renderRecurringIncome();
+  } else {
+    if (riSection) riSection.style.display = 'none';
+    document.querySelectorAll('#page-subscriptions > *:not(#sub-recurring-income):not(#sub-tab-toggle)').forEach(function(el){ el.style.display = ''; });
+    if (btnSubs) { btnSubs.style.background = 'var(--bg-card)'; btnSubs.style.color = 'var(--text-primary)'; }
+    if (btnIncome) { btnIncome.style.background = 'transparent'; btnIncome.style.color = 'var(--text-muted)'; }
+  }
 };
