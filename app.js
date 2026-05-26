@@ -3485,16 +3485,19 @@ window.sendAiMessage = async function() {
       'You have the user real financial data below. Give specific, actionable advice based on their actual numbers. ' +
       'Be concise but thorough. Use bullet points where helpful. ' +
       'Always reference their specific amounts. Be encouraging but honest.\n\n' +
-      'TRANSACTION RECORDING: When the user asks you to add/record a transaction, output a special block at the END of your message in EXACTLY this format (all on one line, no line breaks inside the brackets):\n' +
+      'TRANSACTION RECORDING: When the user asks you to add/record/log a transaction, you MUST output a machine-readable block at the very END of your message. ' +
+      'Use EXACTLY this format with the square brackets — do not change the format:\n' +
       '[TXN:{"type":"income","desc":"From parents","amount":500,"cat":"Other","walletName":"Maybank 123"}]\n' +
-      'Rules for the TXN block:\n' +
-      '- type: must be "income" or "expense"\n' +
-      '- desc: short description of the transaction\n' +
-      '- amount: positive number only, no currency symbol\n' +
-      '- cat: MUST be one of exactly: Salary, Food, Transport, Bills, Investment, Lifestyle, Other\n' +
-      '- walletName: the wallet name the user mentioned (match to their wallet list below), omit this field if no wallet mentioned\n' +
-      '- Only include ONE [TXN:{...}] block per response\n' +
-      '- Always confirm the details in plain text before the block\n\n' +
+      'STRICT RULES — follow exactly:\n' +
+      '- Square brackets [ ] are REQUIRED — do not omit them\n' +
+      '- type: must be exactly "income" or "expense"\n' +
+      '- desc: short description\n' +
+      '- amount: number only, no currency symbol, no commas\n' +
+      '- cat: must be exactly one of: Salary, Food, Transport, Bills, Investment, Lifestyle, Other\n' +
+      '- walletName: wallet name the user mentioned; omit field if none mentioned\n' +
+      '- ONE block only per response, at the very end\n' +
+      '- Do NOT calculate or update balances yourself — the app handles that\n' +
+      '- Do NOT show the raw block text to the user — just write a short confirmation sentence before it\n\n' +
       buildFinancialContext();
 
     // Try multiple model names in case one is unavailable
@@ -3564,12 +3567,12 @@ window.sendAiMessage = async function() {
     var typingEl = document.getElementById(typingId);
     // Safety: only update if this element is an assistant bubble (never a user bubble)
     if (typingEl && typingEl.classList.contains('ai-msg-assistant')) {
-      // Check for [TXN:{...}] block before rendering
-      var txnMatch = reply.match(/\[TXN:(\{[\s\S]*?\})\]/);
+      // Check for [TXN:{...}] block — also catch if AI omits the square brackets
+      var txnMatch = reply.match(/\[TXN:(\{[\s\S]*?\})\]/) || reply.match(/\bTXN:(\{[\s\S]*?\})/);
       var displayReply = reply;
       if (txnMatch) {
-        // Strip the raw [TXN:...] block from visible text
-        displayReply = reply.replace(/\[TXN:\{[\s\S]*?\}\]/, '').trim();
+        // Strip the raw TXN block from visible text (both formats)
+        displayReply = reply.replace(/\[TXN:\{[\s\S]*?\}\]/, '').replace(/\bTXN:\{[\s\S]*?\}/, '').trim();
         try {
           var txnData = JSON.parse(txnMatch[1]);
           var confirmHtml = buildAiTxnCard(txnData);
