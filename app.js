@@ -466,84 +466,110 @@ function renderDashTxns() {
 function renderInsights() {
   var el = document.getElementById('dash-insights');
   if (!el) return;
-  var insights = generateInsights();
 
-  // Activity bar — % of budget remaining
   var sym = curr();
-  var mtxns = getThisMonthTxns();
-  var monthExp = getTotalExpenses(mtxns);
-  var monthInc = getTotalIncome(mtxns) || state.monthlyIncome || 0;
-  var budgetLimit = state.budgetLimit || monthInc;
-  var spentPct = budgetLimit > 0 ? Math.min(100, Math.round((monthExp / budgetLimit) * 100)) : 0;
-  var remaining = Math.max(0, budgetLimit - monthExp);
-  var barColor = spentPct >= 90 ? 'var(--red)' : spentPct >= 70 ? 'var(--amber)' : 'var(--green)';
-  var savRate = getSavingsRate();
+  var hide = state.hideNumbers;
+  function fmtH(n) { return hide ? '••••' : sym + Math.abs(n).toLocaleString('en-US', {minimumFractionDigits:0, maximumFractionDigits:0}); }
 
-  var activityHtml = '<div style="margin-bottom:14px;padding:14px;background:var(--bg-elevated);border-radius:12px;border:1px solid var(--border)">' +
-    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">' +
-      '<div style="font-size:11px;font-weight:600;color:var(--text-muted)">BUDGET USED</div>' +
-      '<div style="font-size:13px;font-weight:700;color:' + barColor + '">' + spentPct + '%</div>' +
+  var mtxns = getThisMonthTxns();
+  var monthExp  = getTotalExpenses(mtxns);
+  var monthInc  = getTotalIncome(mtxns) || state.monthlyIncome || 0;
+  var budgetLimit = state.budgetLimit || monthInc;
+  var spentPct  = budgetLimit > 0 ? Math.min(100, Math.round((monthExp / budgetLimit) * 100)) : 0;
+  var remaining = Math.max(0, budgetLimit - monthExp);
+  var barColor  = spentPct >= 90 ? 'var(--red)' : spentPct >= 70 ? 'var(--amber)' : 'var(--green)';
+  var savRate   = getSavingsRate();
+
+  // ── Budget bar ──
+  var budgetHtml = '<div style="padding:14px;background:var(--bg-elevated);border-radius:12px;border:1px solid var(--border);margin-bottom:10px">' +
+    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">' +
+      '<div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.07em">Budget This Month</div>' +
+      '<div style="font-size:13px;font-weight:700;color:' + barColor + '">' + spentPct + '% used</div>' +
     '</div>' +
-    '<div style="height:8px;background:var(--border);border-radius:99px;overflow:hidden;margin-bottom:8px">' +
+    '<div style="height:7px;background:var(--border);border-radius:99px;overflow:hidden;margin-bottom:8px">' +
       '<div style="height:100%;width:' + spentPct + '%;background:' + barColor + ';border-radius:99px;transition:width 0.6s ease"></div>' +
     '</div>' +
     '<div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text-muted)">' +
-      '<span>Spent: ' + sym + monthExp.toLocaleString('en-US',{maximumFractionDigits:0}) + '</span>' +
-      '<span style="color:' + barColor + '">Left: ' + sym + remaining.toLocaleString('en-US',{maximumFractionDigits:0}) + '</span>' +
+      '<span>Spent: ' + fmtH(monthExp) + '</span>' +
+      '<span style="color:' + barColor + ';font-weight:600">Remaining: ' + fmtH(remaining) + '</span>' +
     '</div>' +
   '</div>';
 
-  var insightCards = insights.map(function(i) {
-    return '<div class="insight-card">' +
-      '<div class="insight-icon" style="background:' + i.bg + '">' + i.icon + '</div>' +
-      '<div><div class="insight-title">' + i.title + '</div><div class="insight-body">' + i.body + '</div></div>' +
+  // ── 3 stat chips ──
+  // 1. Savings rate
+  var savColor = savRate >= 30 ? 'var(--green)' : savRate >= 10 ? 'var(--amber)' : 'var(--red)';
+  var savEmoji = savRate >= 30 ? '🚀' : savRate >= 10 ? '💡' : '⚠️';
+
+  // 2. Biggest spend category
+  var cats = {};
+  mtxns.filter(function(t){ return t.type === 'expense'; }).forEach(function(t){ cats[t.cat] = (cats[t.cat]||0) + t.amount; });
+  var topCat = Object.entries(cats).sort(function(a,b){ return b[1]-a[1]; })[0];
+
+  // 3. Next bill
+  var today = new Date(); today.setHours(0,0,0,0);
+  var todayStr = today.toISOString().slice(0,10);
+  var upcoming = (state.subscriptions || []).filter(function(s){ return s.renewal >= todayStr; })
+    .sort(function(a,b){ return a.renewal.localeCompare(b.renewal); })[0];
+  var daysToNext = upcoming ? Math.round((new Date(upcoming.renewal+'T00:00:00') - today) / 86400000) : null;
+
+  var chipsHtml = '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:10px">' +
+    // Savings rate chip
+    '<div style="padding:10px;background:var(--bg-elevated);border-radius:10px;border:1px solid var(--border);text-align:center">' +
+      '<div style="font-size:16px;margin-bottom:3px">' + savEmoji + '</div>' +
+      '<div style="font-size:15px;font-weight:700;color:' + savColor + '">' + (hide ? '••' : savRate.toFixed(0) + '%') + '</div>' +
+      '<div style="font-size:10px;color:var(--text-muted);margin-top:2px">Savings Rate</div>' +
+    '</div>' +
+    // Top spend chip
+    '<div style="padding:10px;background:var(--bg-elevated);border-radius:10px;border:1px solid var(--border);text-align:center">' +
+      '<div style="font-size:16px;margin-bottom:3px">' + (topCat ? (CAT_ICONS[topCat[0]] || '📋') : '✨') + '</div>' +
+      '<div style="font-size:11px;font-weight:700;color:var(--text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + (topCat ? topCat[0] : 'None yet') + '</div>' +
+      '<div style="font-size:10px;color:var(--text-muted);margin-top:2px">' + (topCat ? fmtH(topCat[1]) : '—') + ' spent</div>' +
+    '</div>' +
+    // Next bill chip
+    '<div style="padding:10px;background:var(--bg-elevated);border-radius:10px;border:1px solid var(--border);text-align:center">' +
+      '<div style="font-size:16px;margin-bottom:3px">📅</div>' +
+      '<div style="font-size:15px;font-weight:700;color:' + (daysToNext !== null && daysToNext <= 3 ? 'var(--red)' : 'var(--text-primary)') + '">' + (daysToNext !== null ? daysToNext + 'd' : '—') + '</div>' +
+      '<div style="font-size:10px;color:var(--text-muted);margin-top:2px">' + (upcoming ? upcoming.name : 'No bills') + '</div>' +
+    '</div>' +
+  '</div>';
+
+  // ── Last 3 transactions mini-list ──
+  var recent = [...state.transactions].sort(function(a,b){
+    var dd = new Date(b.date) - new Date(a.date);
+    return dd !== 0 ? dd : (b.createdAt||0) - (a.createdAt||0);
+  }).slice(0, 3);
+
+  var recentHtml = '';
+  if (recent.length) {
+    recentHtml = '<div style="background:var(--bg-elevated);border-radius:12px;border:1px solid var(--border);overflow:hidden">' +
+      '<div style="padding:10px 14px 6px;font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.07em">Recent Activity</div>' +
+      recent.map(function(t) {
+        var isInc = t.type === 'income';
+        var col = isInc ? 'var(--green)' : 'var(--red)';
+        var sign = isInc ? '+' : '−';
+        var icon = CAT_ICONS[t.cat] || (isInc ? '💰' : '💸');
+        var d = new Date(t.date + 'T00:00:00');
+        var dateStr = d.toLocaleDateString('en-MY', {day:'numeric', month:'short'});
+        return '<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 14px;border-top:1px solid var(--border)">' +
+          '<div style="display:flex;align-items:center;gap:10px;min-width:0">' +
+            '<span style="font-size:16px">' + icon + '</span>' +
+            '<div style="min-width:0">' +
+              '<div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + t.desc + '</div>' +
+              '<div style="font-size:10px;color:var(--text-muted)">' + t.cat + ' · ' + dateStr + '</div>' +
+            '</div>' +
+          '</div>' +
+          '<div style="font-size:13px;font-weight:700;color:' + col + ';flex-shrink:0;margin-left:10px">' + sign + fmtH(t.amount) + '</div>' +
+        '</div>';
+      }).join('') +
     '</div>';
-  }).join('');
+  } else {
+    recentHtml = '<div style="padding:20px;text-align:center;color:var(--text-muted);font-size:13px;background:var(--bg-elevated);border-radius:12px;border:1px solid var(--border)">No transactions yet — add your first one!</div>';
+  }
 
-  el.innerHTML = activityHtml + (insightCards || '<div class="empty-state"><div class="empty-state-icon">🤖</div><div class="empty-state-title">Add more data for insights</div></div>');
+  el.innerHTML = budgetHtml + chipsHtml + recentHtml;
 }
 
-function generateInsights() {
-  const insights = [];
-  const savRate = getSavingsRate();
-  const mtxns = getThisMonthTxns();
-  const monthExp = getTotalExpenses(mtxns);
-  const monthInc = getTotalIncome(mtxns);
-  const pnl = getTotalPnL();
-  const pnlPct = getTotalInvested() ? (pnl / getTotalInvested()) * 100 : 0;
-
-  if (savRate > 30) {
-    insights.push({ icon: '🚀', bg: 'var(--green-dim)', title: 'Excellent Savings Rate!', body: `You're saving ${savRate.toFixed(0)}% of your income this month. Keep it up — you're on the wealth-building fast track.` });
-  } else if (savRate > 10) {
-    insights.push({ icon: '💡', bg: 'var(--blue-dim)', title: 'Good Savings Habit', body: `Your ${savRate.toFixed(0)}% savings rate is decent. Try to push toward 30% to accelerate your financial goals.` });
-  } else if (monthInc > 0) {
-    insights.push({ icon: '⚠️', bg: 'var(--amber-dim)', title: 'Savings Rate Alert', body: `You're saving only ${savRate.toFixed(0)}% this month. Review your spending and try to cut unnecessary expenses.` });
-  }
-
-  if (state.investments.length === 0) {
-    insights.push({ icon: '📈', bg: 'var(--blue-dim)', title: 'Start Investing', body: 'You have no investments tracked. Consider starting with index ETFs like VOO or VWRA for diversified exposure.' });
-  } else if (pnlPct < -5) {
-    insights.push({ icon: '📉', bg: 'var(--red-dim)', title: 'Portfolio Down', body: `Your portfolio is down ${Math.abs(pnlPct).toFixed(1)}%. Consider averaging down or reviewing your positions.` });
-  } else if (pnlPct > 10) {
-    insights.push({ icon: '💰', bg: 'var(--green-dim)', title: 'Portfolio Performing Well', body: `Your investments are up ${pnlPct.toFixed(1)}%! Consider rebalancing if any single position exceeds 25% of your portfolio.` });
-  }
-
-  const foodExp = mtxns.filter(t => t.type==='expense' && t.cat==='Food').reduce((s,t) => s+t.amount, 0);
-  if (foodExp > monthInc * 0.3 && monthInc > 0) {
-    insights.push({ icon: '🍔', bg: 'var(--red-dim)', title: 'High Food Spending', body: `Food costs ${fmtFull(foodExp)} this month (${((foodExp/monthInc)*100).toFixed(0)}% of income). Consider meal prepping to reduce this.` });
-  }
-
-  const subTotal = getMonthlySubTotal();
-  if (subTotal > 500) {
-    insights.push({ icon: '🔄', bg: 'var(--amber-dim)', title: 'Subscription Costs', body: `You're spending ${fmtFull(subTotal)}/month on subscriptions. Review which ones you actively use.` });
-  }
-
-  if (state.goals.length === 0) {
-    insights.push({ icon: '🎯', bg: 'var(--purple-dim)', title: 'Set Financial Goals', body: 'Define clear financial targets — an emergency fund, retirement fund, or dream vacation. Goals make saving intentional.' });
-  }
-
-  return insights.slice(0, 4);
-}
+function generateInsights() { return []; } // kept for compatibility
 
 // ── Net Worth Chart ──────────────────────────────────────
 function renderNetworthChart() {
@@ -1474,6 +1500,10 @@ async function invFetchPrice() {
   else if (COMMODITY_SYMBOLS[ticker]) typeEl.value = 'commodity';
   const type = typeEl.value;
 
+  // Lock the type — auto-detected, user shouldn't change it
+  typeEl.disabled = true;
+  typeEl.title = 'Auto-detected from ticker';
+
   btn.disabled = true;
   btn.innerHTML = SPIN_SVG + ' Fetching...';
   statusEl.textContent = 'Fetching live price...';
@@ -1514,6 +1544,9 @@ async function invFetchPrice() {
 
   } catch(e) {
     console.error('Fetch error:', e);
+    // Re-enable type selector so user can pick manually when ticker is wrong
+    typeEl.disabled = false;
+    typeEl.title = '';
     // Show a helpful error card — user can still enter prices manually
     resultEl.style.display = 'block';
     resultEl.style.borderColor = 'var(--red)';
@@ -1561,7 +1594,8 @@ function updatePnlPreview() {
 async function saveInvestment() {
   const id         = document.getElementById('inv-edit-id').value;
   const name       = document.getElementById('inv-name').value.trim().toUpperCase();
-  const type       = document.getElementById('inv-type').value;
+  const typeEl     = document.getElementById('inv-type');
+  const type       = typeEl.value; // works even when disabled
   const invCurrency= document.getElementById('inv-currency').value || state.currency;
   const qty        = parseFloat(document.getElementById('inv-qty').value);
   const buyPriceEl = parseFloat(document.getElementById('inv-buy').value);
@@ -1580,7 +1614,26 @@ async function saveInvestment() {
   // If user manually edited the buy price field, honour it
   if (!isNaN(buyPriceEl) && buyPriceEl > 0) buyPrice = buyPriceEl;
 
-  // If we still don't have prices, auto-fetch now
+  // If we have a manual buy price but no live price, save with fetchFailed flag
+  // instead of trying to re-fetch (which fails on mobile) and blocking the save
+  if (!currentPrice && buyPrice) {
+    currentPrice = buyPrice; // use buy price as placeholder until next refresh
+    const lastUpdated = new Date().toISOString();
+    if (id) {
+      const idx = state.investments.findIndex(i => i.id === id);
+      if (idx !== -1) {
+        state.investments[idx] = { ...state.investments[idx], name, type, invCurrency, qty, buyPrice, currentPrice, date, lastUpdated, fetchFailed: true };
+      }
+      toast('Investment updated (manual prices)', 'success');
+    } else {
+      state.investments.push({ id: uid(), name, type, invCurrency, qty, buyPrice, currentPrice, date, lastUpdated, fetchFailed: true });
+      toast(name + ' added with manual price. Tap "Refresh Prices" later to get live data.', 'success');
+    }
+    save(); closeModal('add-inv-modal'); renderAll();
+    return;
+  }
+
+  // If we still don't have prices at all, auto-fetch now as last resort
   if (!currentPrice || !buyPrice) {
     saveBtn.disabled = true;
     saveBtn.innerHTML = SPIN_SVG + ' Fetching prices...';
@@ -1599,7 +1652,7 @@ async function saveInvestment() {
       saveBtn.disabled = false;
       saveBtn.textContent = 'Save Investment';
       statusEl.textContent = '';
-      toast('Could not fetch prices — please enter buy price manually', 'error');
+      toast('Could not fetch prices — please enter buy price manually above', 'error');
       return;
     }
     saveBtn.disabled = false;
@@ -1876,6 +1929,8 @@ function resetInvModal() {
   document.getElementById('inv-name').value = '';
   document.getElementById('inv-name').removeAttribute('readonly');
   document.getElementById('inv-type').value = 'stock';
+  document.getElementById('inv-type').disabled = false;
+  document.getElementById('inv-type').title = '';
   document.getElementById('inv-currency').value = 'USD';
   var d = document.getElementById('inv-currency-display');
   if (d) d.textContent = 'Auto-detected from ticker';
