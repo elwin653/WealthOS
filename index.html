@@ -569,6 +569,10 @@
               </select>
             </div>
           </div>
+          <div class="form-group" style="margin-bottom:12px">
+            <label class="form-label">Linked Wallet <span style="font-size:10px;color:var(--text-muted);font-weight:400">(optional — deposits rent/income into this account)</span></label>
+            <div id="ri-wallet-wrap"></div>
+          </div>
           <button class="btn btn-primary btn-sm" onclick="addRecurringIncome()" style="width:100%;justify-content:center">+ Add Recurring Income</button>
         </div>
       </div>
@@ -1197,6 +1201,11 @@
         <label class="form-label">Next Renewal</label>
         <input type="date" class="form-input" id="sub-renewal">
       </div>
+    </div>
+    <!-- Linked Liability — optional, for loan/mortgage tracking -->
+    <div class="form-group" style="margin-top:4px">
+      <label class="form-label">Linked Liability <span style="font-size:10px;color:var(--text-muted);font-weight:400">(optional — reduces loan balance each payment)</span></label>
+      <div id="sub-liability-wrap"></div>
     </div>
     <div style="display:flex;gap:10px;margin-top:8px">
       <button class="btn btn-ghost" onclick="closeModal('add-sub-modal')" style="flex:1">Cancel</button>

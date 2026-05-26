@@ -1307,7 +1307,10 @@ window.switchSubTab = function(tab) {
       addLabel.textContent = 'Add Income';
     }
   }
-  if (!isSubs && window.renderRecurringIncome) window.renderRecurringIncome();
+  if (!isSubs && window.renderRecurringIncome) {
+    window.renderRecurringIncome();
+    populateRiWalletDropdown('');
+  }
 };
 
 function renderSubscriptions() {
@@ -1840,6 +1843,34 @@ function selectGoalIcon(icon) {
   });
 }
 
+function populateSubLiabilityDropdown(selectedId) {
+  var wrap = document.getElementById('sub-liability-wrap');
+  if (!wrap) return;
+  var liabilities = (state.accounts || []).filter(function(a) { return a.type === 'liability'; });
+  if (!liabilities.length) {
+    wrap.innerHTML = '<div style="font-size:12px;color:var(--text-muted);padding:8px 0">No liability accounts — add one in Wallet first.</div>';
+    return;
+  }
+  var opts = liabilities.map(function(a) {
+    return '<option value="' + a.id + '"' + (a.id === selectedId ? ' selected' : '') + '>' + (a.icon || '🏦') + ' ' + a.name + ' (Balance: ' + curr() + Math.abs(a.balance || 0).toLocaleString('en-US', {minimumFractionDigits:0, maximumFractionDigits:0}) + ')</option>';
+  }).join('');
+  wrap.innerHTML = '<select class="form-select" id="sub-liability-id"><option value="">None — no loan linked</option>' + opts + '</select>';
+}
+
+function populateRiWalletDropdown(selectedId) {
+  var wrap = document.getElementById('ri-wallet-wrap');
+  if (!wrap) return;
+  var wallets = (state.accounts || []).filter(function(a) { return a.type === 'cash' || a.type === 'bank'; });
+  if (!wallets.length) {
+    wrap.innerHTML = '<div style="font-size:12px;color:var(--text-muted);padding:8px 0">No cash/bank accounts — add one in Wallet first.</div>';
+    return;
+  }
+  var opts = wallets.map(function(a) {
+    return '<option value="' + a.id + '"' + (a.id === selectedId ? ' selected' : '') + '>' + (a.icon || '💳') + ' ' + a.name + '</option>';
+  }).join('');
+  wrap.innerHTML = '<select class="form-select" id="ri-wallet-id"><option value="">None</option>' + opts + '</select>';
+}
+
 // ── CRUD: Subscriptions ───────────────────────────────────
 function saveSubscription() {
   const id = document.getElementById('sub-edit-id').value;
@@ -1850,16 +1881,20 @@ function saveSubscription() {
   const cycle = document.getElementById('sub-cycle').value;
   const cat = document.getElementById('sub-cat').value;
   const renewal = document.getElementById('sub-renewal').value;
+  const liabilityEl = document.getElementById('sub-liability-id');
+  const linkedLiabilityId = liabilityEl ? liabilityEl.value : '';
 
   if (!name) { toast('Enter service name', 'error'); return; }
   if (!amount || amount <= 0) { toast('Enter valid amount', 'error'); return; }
 
   if (id) {
     const idx = state.subscriptions.findIndex(s => s.id === id);
-    if (idx !== -1) state.subscriptions[idx] = { ...state.subscriptions[idx], name, icon, amount, cycle, cat, renewal };
+    if (idx !== -1) state.subscriptions[idx] = { ...state.subscriptions[idx], name, icon, amount, cycle, cat, renewal, linkedLiabilityId: linkedLiabilityId || undefined };
     toast('Updated', 'success');
   } else {
-    state.subscriptions.push({ id: uid(), name, icon, amount, cycle, cat, renewal });
+    const sub = { id: uid(), name, icon, amount, cycle, cat, renewal };
+    if (linkedLiabilityId) sub.linkedLiabilityId = linkedLiabilityId;
+    state.subscriptions.push(sub);
     toast('Subscription added', 'success');
   }
   save(); closeModal('add-sub-modal'); renderSubscriptions();
@@ -2049,6 +2084,15 @@ function openModal(id) {
     if (subIconEl) subIconEl.value = '';
     document.getElementById('sub-amount').value = '';
     document.getElementById('sub-renewal').value = '';
+    populateSubLiabilityDropdown('');
+  }
+  if (id === 'add-sub-modal') {
+    // Always ensure liability dropdown is populated (for edit too)
+    var editSubId = document.getElementById('sub-edit-id').value;
+    if (editSubId) {
+      var editSub = (state.subscriptions || []).find(function(s){ return s.id === editSubId; });
+      populateSubLiabilityDropdown(editSub ? (editSub.linkedLiabilityId || '') : '');
+    }
   }
 }
 
@@ -2902,6 +2946,15 @@ function processSubscriptionCharges() {
           date: sub.renewal,
           subId: sub.id
         });
+
+        // If linked to a liability account, reduce its balance
+        if (sub.linkedLiabilityId) {
+          var liabAccount = (state.accounts || []).find(function(a) { return a.id === sub.linkedLiabilityId; });
+          if (liabAccount) {
+            liabAccount.balance = Math.max(0, (liabAccount.balance || 0) - sub.amount);
+          }
+        }
+
         charged.push(sub.name);
       }
 
@@ -3912,7 +3965,7 @@ function processRecurringIncome() {
     if (!alreadyCharged) {
       // Create the income transaction
       var txDate = monthKey + '-' + String(ri.dayOfMonth).padStart(2, '0');
-      state.transactions.push({
+      var newTxn = {
         id: uid(),
         type: 'income',
         desc: ri.name,
@@ -3921,9 +3974,18 @@ function processRecurringIncome() {
         date: txDate,
         createdAt: new Date().toISOString(),
         recurringId: ri.id
-      });
+      };
+      // If linked to a wallet, deposit into it and tag the transaction
+      if (ri.walletId) {
+        var wa = (state.accounts || []).find(function(a){ return a.id === ri.walletId; });
+        if (wa) {
+          wa.balance = (wa.balance || 0) + ri.amount;
+          newTxn.walletId = ri.walletId;
+        }
+      }
+      state.transactions.push(newTxn);
       changed = true;
-      toast('💰 ' + ri.name + ' — ' + curr() + ri.amount.toLocaleString('en-MY', {minimumFractionDigits:2}) + ' added', 'success');
+      toast('💰 ' + ri.name + ' — ' + curr() + ri.amount.toLocaleString('en-MY', {minimumFractionDigits:2}) + ' added' + (ri.walletId ? ' to wallet' : ''), 'success');
     }
   });
 
@@ -3946,10 +4008,15 @@ window.renderRecurringIncome = function() {
   }
 
   el.innerHTML = items.map(function(ri) {
+    var walletName = '';
+    if (ri.walletId) {
+      var wa = (state.accounts || []).find(function(a){ return a.id === ri.walletId; });
+      if (wa) walletName = ' · → ' + (wa.icon || '') + ' ' + wa.name;
+    }
     return '<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border)">' +
       '<div>' +
         '<div style="font-size:13.5px;font-weight:600">' + ri.name + '</div>' +
-        '<div style="font-size:11px;color:var(--text-muted)">' + sym + ri.amount.toLocaleString('en-MY',{minimumFractionDigits:2}) + ' · Every month on day ' + ri.dayOfMonth + ' · ' + (ri.cat||'Salary') + '</div>' +
+        '<div style="font-size:11px;color:var(--text-muted)">' + sym + ri.amount.toLocaleString('en-MY',{minimumFractionDigits:2}) + ' · Day ' + ri.dayOfMonth + ' · ' + (ri.cat||'Salary') + walletName + '</div>' +
       '</div>' +
       '<button onclick="deleteRecurringIncome(\'' + ri.id + '\')" style="background:none;border:none;cursor:pointer;color:var(--red);font-size:18px;padding:4px">✕</button>' +
     '</div>';
@@ -3961,13 +4028,17 @@ window.addRecurringIncome = function() {
   var amount = parseFloat(document.getElementById('ri-amount').value);
   var day = parseInt(document.getElementById('ri-day').value);
   var cat = document.getElementById('ri-cat').value;
+  var walletEl = document.getElementById('ri-wallet-id');
+  var walletId = walletEl ? walletEl.value : '';
 
   if (!name) { toast('Please enter a name', 'error'); return; }
   if (!amount || amount <= 0) { toast('Please enter a valid amount', 'error'); return; }
   if (!day || day < 1 || day > 28) { toast('Day must be between 1 and 28', 'error'); return; }
 
   if (!Array.isArray(state.recurringIncome)) state.recurringIncome = [];
-  state.recurringIncome.push({ id: uid(), name: name, amount: amount, dayOfMonth: day, cat: cat });
+  var entry = { id: uid(), name: name, amount: amount, dayOfMonth: day, cat: cat };
+  if (walletId) entry.walletId = walletId;
+  state.recurringIncome.push(entry);
   save();
   processRecurringIncome();
 
@@ -3975,6 +4046,7 @@ window.addRecurringIncome = function() {
   document.getElementById('ri-name').value = '';
   document.getElementById('ri-amount').value = '';
   document.getElementById('ri-day').value = '1';
+  populateRiWalletDropdown('');
 
   window.renderRecurringIncome();
   toast('✓ Recurring income added', 'success');
