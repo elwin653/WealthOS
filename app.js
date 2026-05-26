@@ -3375,7 +3375,7 @@ function buildAiTxnCard(txnData) {
     walletId: matchedWalletId
   }).replace(/'/g, '&apos;');
 
-  return '<div style="margin-top:12px;background:' + bg + ';border:1.5px solid ' + color + ';border-radius:12px;padding:14px">' +
+  return '<div data-txn-card="1" style="margin-top:12px;background:' + bg + ';border:1.5px solid ' + color + ';border-radius:12px;padding:14px">' +
     '<div style="font-size:11px;font-weight:700;color:' + color + ';text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px">📋 Transaction to Add</div>' +
     '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:10px">' +
       '<div style="font-size:12px;color:var(--text-muted)">Type</div>' +
@@ -3392,7 +3392,7 @@ function buildAiTxnCard(txnData) {
     '<div style="display:flex;gap:8px">' +
       '<button onclick="confirmAiTransaction(\'' + payload.replace(/\\/g,'\\\\').replace(/"/g,'&quot;') + '\')" ' +
         'style="flex:2;padding:8px 14px;background:' + color + ';color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer">✅ Add Transaction</button>' +
-      '<button onclick="this.closest(\'[style*=border]\').remove()" ' +
+      '<button onclick="this.closest(\'[data-txn-card]\').remove()" ' +
         'style="flex:1;padding:8px 10px;background:var(--bg-elevated);color:var(--text-muted);border:1px solid var(--border);border-radius:8px;font-size:13px;cursor:pointer">✗ Cancel</button>' +
     '</div>' +
   '</div>';
@@ -3422,7 +3422,7 @@ window.confirmAiTransaction = function(payloadStr) {
     // Replace the confirm card with a success message
     var sym = curr();
     var sign = txnData.type === 'income' ? '+' : '−';
-    event.target.closest('[style*="border"]').outerHTML =
+    event.target.closest('[data-txn-card]').outerHTML =
       '<div style="margin-top:10px;padding:10px 14px;background:rgba(52,211,153,0.12);border:1px solid var(--green);border-radius:10px;font-size:13px;color:var(--green);font-weight:600">' +
         '✅ Transaction added: ' + sign + sym + parseFloat(txnData.amount).toLocaleString('en-US',{minimumFractionDigits:2}) + ' — ' + txnData.desc +
       '</div>';
