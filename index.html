@@ -249,8 +249,8 @@
         </div>
         <div class="card" style="margin:0">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
-            <div class="chart-label" style="margin-bottom:0;font-size:11px" data-i18n="insights">Insights</div>
-            <span class="badge badge-green" style="font-size:10px">AI</span>
+            <div class="chart-label" style="margin-bottom:0;font-size:11px">Financial Pulse</div>
+            <span class="badge badge-blue" style="font-size:10px">Live</span>
           </div>
           <div id="dash-insights"></div>
         </div>
@@ -280,6 +280,9 @@
       <div class="inv-stats-grid" id="inv-stats"></div>
 
       <div class="card" style="overflow:hidden">
+        <!-- Mobile card list — shown only on mobile -->
+        <div id="inv-list-mobile"></div>
+        <!-- Desktop table — hidden on mobile via CSS -->
         <div class="inv-table-desktop">
           <table style="width:100%">
             <thead>
@@ -1056,8 +1059,8 @@
 
     <div class="form-grid">
       <div class="form-group">
-        <label class="form-label">Asset Type</label>
-        <select class="form-select" id="inv-type">
+        <label class="form-label">Asset Type <span style="font-size:10px;color:var(--text-muted);font-weight:400;text-transform:none">(auto-detected — unlocks if ticker fails)</span></label>
+        <select class="form-select" id="inv-type" disabled title="Auto-detected after Fetch Price">
           <option value="stock">Stock</option>
           <option value="etf">ETF</option>
           <option value="crypto">Crypto</option>
