@@ -458,6 +458,23 @@ td.td-mono { font-family: 'DM Mono', monospace; font-size: 13px; }
   z-index: 9999;
 }
 
+@media (max-width: 900px) {
+  #toast-container {
+    bottom: auto;
+    top: calc(env(safe-area-inset-top) + 12px);
+    right: 12px;
+    left: 12px;
+    align-items: stretch;
+  }
+  .toast {
+    min-width: unset;
+    max-width: unset;
+    width: 100%;
+  }
+  @keyframes toastIn { from { opacity: 0; transform: translateY(-20px) scale(0.95); } to { opacity: 1; transform: none; } }
+  @keyframes toastOut { to { opacity: 0; transform: translateY(-10px); } }
+}
+
 .toast {
   background: var(--bg-elevated);
   border: 1px solid var(--border);

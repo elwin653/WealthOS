@@ -716,9 +716,9 @@ function renderInvestments() {
     var pnlSign = pnl >= 0 ? '+' : '';
     var liveTime = i.lastUpdated ? new Date(i.lastUpdated).toLocaleTimeString('en-MY',{hour:'2-digit',minute:'2-digit'}) : '';
 
-    // Mobile card
+    // Mobile card (same style as original)
     mobileCards.push(
-      '<div style="padding:14px 12px;border-bottom:1px solid var(--border)">' +
+      '<div style="padding:14px 4px;border-bottom:1px solid var(--border)">' +
         '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">' +
           '<div style="display:flex;align-items:center;gap:10px">' +
             '<div style="width:10px;height:10px;border-radius:50%;background:' + col + ';flex-shrink:0"></div>' +
@@ -1263,6 +1263,27 @@ function getMonthlySubTotal() {
     return s + monthly;
   }, 0);
 }
+
+window.switchSubTab = function(tab) {
+  var isSubs = tab === 'subs';
+  document.getElementById('sub-panel-subs').style.display = isSubs ? '' : 'none';
+  document.getElementById('sub-panel-income').style.display = isSubs ? 'none' : '';
+  document.getElementById('sub-tab-subs').classList.toggle('active', isSubs);
+  document.getElementById('sub-tab-income').classList.toggle('active', !isSubs);
+  // Update add button
+  var addBtn = document.getElementById('sub-add-btn');
+  var addLabel = document.getElementById('sub-add-label');
+  if (addBtn && addLabel) {
+    if (isSubs) {
+      addBtn.onclick = function(){ openModal('add-sub-modal'); };
+      addLabel.textContent = 'Add Subscription';
+    } else {
+      addBtn.onclick = function(){ document.getElementById('ri-name').focus(); };
+      addLabel.textContent = 'Add Income';
+    }
+  }
+  if (!isSubs && window.renderRecurringIncome) window.renderRecurringIncome();
+};
 
 function renderSubscriptions() {
   const monthly = getMonthlySubTotal();
@@ -2887,7 +2908,6 @@ function processSubscriptionCharges() {
 // ═══════════════════════════════════════════════════════════
 window.renderSettingsPage = function() {
   if (window.renderNavSettings) window.renderNavSettings();
-  if (window.renderRecurringIncome) window.renderRecurringIncome();
   var themeMode = state.themeMode || 'dark';
   var lang = state.language || 'en';
 
