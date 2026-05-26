@@ -37,8 +37,8 @@ var LANG = {
 // ── State ──────────────────────────────────────────────
 let state = {
   currency: 'MYR',
-  darkMode: false,
-  themeMode: 'light',
+  darkMode: true,
+  themeMode: 'dark',
   hideNumbers: false,
   transactions: [],
   investments: [],
@@ -431,7 +431,7 @@ function _renderDashboard() {
   renderNetworthChart();
   renderExpenseDonut();
   renderDashTxns();
-  renderUpcoming();
+  renderInsights();
 }
 
 function renderDashTxns() {
@@ -463,58 +463,44 @@ function renderDashTxns() {
   `).join('');
 }
 
-function renderUpcoming() {
-  var el = document.getElementById('dash-upcoming');
+function renderInsights() {
+  var el = document.getElementById('dash-insights');
   if (!el) return;
+  var insights = generateInsights();
+
+  // Activity bar — % of budget remaining
   var sym = curr();
-  var today = new Date();
-  var items = [];
+  var mtxns = getThisMonthTxns();
+  var monthExp = getTotalExpenses(mtxns);
+  var monthInc = getTotalIncome(mtxns) || state.monthlyIncome || 0;
+  var budgetLimit = state.budgetLimit || monthInc;
+  var spentPct = budgetLimit > 0 ? Math.min(100, Math.round((monthExp / budgetLimit) * 100)) : 0;
+  var remaining = Math.max(0, budgetLimit - monthExp);
+  var barColor = spentPct >= 90 ? 'var(--red)' : spentPct >= 70 ? 'var(--amber)' : 'var(--green)';
+  var savRate = getSavingsRate();
 
-  // Next subscriptions due in the next 30 days
-  (state.subscriptions || []).forEach(function(sub) {
-    if (!sub.renewal) return;
-    var due = new Date(sub.renewal + 'T00:00:00');
-    var diff = Math.round((due - today) / 86400000);
-    if (diff >= 0 && diff <= 30) {
-      items.push({ type: 'sub', name: sub.name, amount: -sub.amount, date: sub.renewal, diff: diff, label: diff === 0 ? 'Today' : 'In ' + diff + 'd' });
-    }
-  });
+  var activityHtml = '<div style="margin-bottom:14px;padding:14px;background:var(--bg-elevated);border-radius:12px;border:1px solid var(--border)">' +
+    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">' +
+      '<div style="font-size:11px;font-weight:600;color:var(--text-muted)">BUDGET USED</div>' +
+      '<div style="font-size:13px;font-weight:700;color:' + barColor + '">' + spentPct + '%</div>' +
+    '</div>' +
+    '<div style="height:8px;background:var(--border);border-radius:99px;overflow:hidden;margin-bottom:8px">' +
+      '<div style="height:100%;width:' + spentPct + '%;background:' + barColor + ';border-radius:99px;transition:width 0.6s ease"></div>' +
+    '</div>' +
+    '<div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text-muted)">' +
+      '<span>Spent: ' + sym + monthExp.toLocaleString('en-US',{maximumFractionDigits:0}) + '</span>' +
+      '<span style="color:' + barColor + '">Left: ' + sym + remaining.toLocaleString('en-US',{maximumFractionDigits:0}) + '</span>' +
+    '</div>' +
+  '</div>';
 
-  // Next recurring income due this month
-  (state.recurringIncome || []).forEach(function(ri) {
-    var dueDay = ri.dayOfMonth;
-    var dueDate = new Date(today.getFullYear(), today.getMonth(), dueDay);
-    if (dueDate < today) dueDate.setMonth(dueDate.getMonth() + 1);
-    var diff = Math.round((dueDate - today) / 86400000);
-    if (diff <= 30) {
-      items.push({ type: 'income', name: ri.name, amount: ri.amount, diff: diff, label: diff === 0 ? 'Today' : 'In ' + diff + 'd' });
-    }
-  });
-
-  // Sort by soonest
-  items.sort(function(a,b){ return a.diff - b.diff; });
-
-  if (!items.length) {
-    el.innerHTML = '<div style="font-size:12px;color:var(--text-muted);text-align:center;padding:12px 0">No upcoming bills or income in the next 30 days</div>';
-    return;
-  }
-
-  el.innerHTML = items.slice(0, 5).map(function(item) {
-    var color = item.type === 'income' ? 'var(--green)' : 'var(--red)';
-    var icon = item.type === 'income' ? '💰' : '🔄';
-    var sign = item.type === 'income' ? '+' : '-';
-    var urgency = item.diff <= 3 ? 'rgba(248,113,113,0.1)' : 'var(--bg-elevated)';
-    return '<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 10px;background:' + urgency + ';border-radius:8px;margin-bottom:6px">' +
-      '<div style="display:flex;align-items:center;gap:8px">' +
-        '<span style="font-size:14px">' + icon + '</span>' +
-        '<div>' +
-          '<div style="font-size:12.5px;font-weight:600">' + item.name + '</div>' +
-          '<div style="font-size:10px;color:var(--text-muted)">' + item.label + '</div>' +
-        '</div>' +
-      '</div>' +
-      '<div style="font-size:12.5px;font-weight:700;color:' + color + '">' + sign + sym + Math.abs(item.amount).toLocaleString('en-MY',{minimumFractionDigits:2,maximumFractionDigits:2}) + '</div>' +
+  var insightCards = insights.map(function(i) {
+    return '<div class="insight-card">' +
+      '<div class="insight-icon" style="background:' + i.bg + '">' + i.icon + '</div>' +
+      '<div><div class="insight-title">' + i.title + '</div><div class="insight-body">' + i.body + '</div></div>' +
     '</div>';
   }).join('');
+
+  el.innerHTML = activityHtml + (insightCards || '<div class="empty-state"><div class="empty-state-icon">🤖</div><div class="empty-state-title">Add more data for insights</div></div>');
 }
 
 function generateInsights() {
@@ -1245,18 +1231,6 @@ function getMonthlySubTotal() {
 }
 
 function renderSubscriptions() {
-  // Add tab toggle if not already there
-  var header = document.querySelector('#page-subscriptions .page-header');
-  if (header && !document.getElementById('sub-tab-toggle')) {
-    var tabHtml = '<div style="display:flex;gap:8px;margin:0 20px 8px;background:var(--bg-elevated);border-radius:10px;padding:4px">' +
-      '<button id="sub-tab-subs" onclick="showSubTab(\"subs\")" style="flex:1;padding:7px;border:none;border-radius:7px;background:var(--bg-card);font-family:inherit;font-size:12px;font-weight:600;cursor:pointer;color:var(--text-primary)">🔄 Subscriptions</button>' +
-      '<button id="sub-tab-income" onclick="showSubTab(\"income\")" style="flex:1;padding:7px;border:none;border-radius:7px;background:transparent;font-family:inherit;font-size:12px;font-weight:600;cursor:pointer;color:var(--text-muted)">💰 Recurring Income</button>' +
-    '</div>';
-    var tabEl = document.createElement('div');
-    tabEl.id = 'sub-tab-toggle';
-    tabEl.innerHTML = tabHtml;
-    header.after(tabEl);
-  }
   const monthly = getMonthlySubTotal();
   const yearly = monthly * 12;
   document.getElementById('sub-stats').innerHTML = [
@@ -1333,12 +1307,39 @@ function selectTxnType(type) {
   }
 }
 
+function populateTxnWalletDropdown(selectedId) {
+  const wrap = document.getElementById('txn-wallet-wrap');
+  if (!wrap) return;
+  const accounts = state.accounts || [];
+  if (!accounts.length) {
+    // No wallets — show redirect prompt
+    wrap.innerHTML =
+      '<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;background:var(--bg-elevated);border-radius:10px;border:1px solid var(--border)">' +
+        '<span style="font-size:13px;color:var(--text-muted)">No wallets yet</span>' +
+        '<button class="btn btn-ghost btn-sm" onclick="closeModal(\'add-txn-modal\');navigate(\'wallet\');" style="font-size:12px;padding:4px 10px">+ Create wallet →</button>' +
+      '</div>';
+    return;
+  }
+  // Build dropdown
+  const opts = accounts.map(function(a) {
+    const sel = a.id === selectedId ? ' selected' : '';
+    return '<option value="' + a.id + '"' + sel + '>' + (a.icon || '') + ' ' + a.name + '</option>';
+  }).join('');
+  wrap.innerHTML =
+    '<select class="form-select" id="txn-wallet-id">' +
+      '<option value="">No wallet</option>' +
+      opts +
+    '</select>';
+}
+
 function saveTransaction() {
   const id = document.getElementById('txn-edit-id').value;
   const desc = document.getElementById('txn-desc').value.trim();
   const amount = parseFloat(document.getElementById('txn-amount').value);
   const cat = document.getElementById('txn-cat').value;
   const date = document.getElementById('txn-date').value;
+  const walletEl = document.getElementById('txn-wallet-id');
+  const walletId = walletEl ? walletEl.value : '';
 
   if (!desc) { toast('Please enter a description', 'error'); return; }
   if (!amount || amount <= 0) { toast('Please enter a valid amount', 'error'); return; }
@@ -1346,19 +1347,27 @@ function saveTransaction() {
 
   if (id) {
     const idx = state.transactions.findIndex(t => t.id === id);
-    if (idx !== -1) state.transactions[idx] = { ...state.transactions[idx], desc, amount, cat, date, type: state.selectedTxnType, updatedAt: Date.now() };
+    if (idx !== -1) {
+      const old = state.transactions[idx];
+      // Reverse old wallet effect
+      if (old.walletId) {
+        const wa = (state.accounts || []).find(a => a.id === old.walletId);
+        if (wa) wa.balance -= (old.type === 'income' ? old.amount : -old.amount);
+      }
+      state.transactions[idx] = { ...old, desc, amount, cat, date, type: state.selectedTxnType, walletId: walletId || undefined, updatedAt: Date.now() };
+      // Apply new wallet effect
+      if (walletId) {
+        const wa = (state.accounts || []).find(a => a.id === walletId);
+        if (wa) wa.balance += (state.selectedTxnType === 'income' ? amount : -amount);
+      }
+    }
     toast('Transaction updated', 'success');
   } else {
-    var newTxn = { id: uid(), desc, amount, cat, date, type: state.selectedTxnType, createdAt: Date.now() };
-    // Adjust wallet balance if a wallet was selected
-    var wSel = document.getElementById('txn-wallet');
-    var wId = wSel ? wSel.value : '';
-    if (wId && Array.isArray(state.accounts)) {
-      var wAcct = state.accounts.find(function(a){ return a.id === wId; });
-      if (wAcct) {
-        wAcct.balance = (wAcct.balance || 0) + (state.selectedTxnType === 'income' ? amount : -amount);
-        newTxn.walletId = wId;
-      }
+    const newTxn = { id: uid(), desc, amount, cat, date, type: state.selectedTxnType, createdAt: Date.now() };
+    if (walletId) {
+      newTxn.walletId = walletId;
+      const wa = (state.accounts || []).find(a => a.id === walletId);
+      if (wa) wa.balance += (state.selectedTxnType === 'income' ? amount : -amount);
     }
     state.transactions.push(newTxn);
     toast('Transaction added', 'success');
@@ -1378,6 +1387,7 @@ function editTransaction(id) {
   document.getElementById('txn-cat').value = t.cat;
   document.getElementById('txn-date').value = t.date;
   selectTxnType(t.type);
+  populateTxnWalletDropdown(t.walletId || '');
   openModal('add-txn-modal');
 }
 
@@ -1504,21 +1514,8 @@ async function invFetchPrice() {
 
   } catch(e) {
     console.error('Fetch error:', e);
-    statusEl.textContent = '⚠️ Price fetch failed — enter price manually below';
-    toast('Could not auto-fetch ' + ticker + ' price. This may be a proxy issue — enter your buy price manually.', 'error');
-    // Show manual entry fields
-    resultEl.style.display = 'block';
-    resultEl.innerHTML = '<div style="background:rgba(248,113,113,0.08);border:1px solid rgba(248,113,113,0.3);border-radius:10px;padding:12px;margin-top:8px">' +
-      '<div style="font-size:12px;color:var(--red);font-weight:600;margin-bottom:8px">⚠️ Could not auto-fetch price for ' + ticker + '</div>' +
-      '<div style="font-size:12px;color:var(--text-muted);margin-bottom:10px">The ticker may be valid but the price API is temporarily unavailable. Enter the price manually:</div>' +
-      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">' +
-        '<div><label style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:4px">Current Price</label>' +
-        '<input type="number" id="inv-manual-current" class="form-input" placeholder="e.g. 545.00" step="0.0001"></div>' +
-        '<div><label style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:4px">Buy Price (on purchase date)</label>' +
-        '<input type="number" id="inv-manual-buy" class="form-input" placeholder="e.g. 520.00" step="0.0001"></div>' +
-      '</div>' +
-      '<button onclick="applyManualPrices(\'' + ticker + '\')" class="btn btn-primary btn-sm" style="width:100%;justify-content:center;margin-top:10px">Use These Prices</button>' +
-    '</div>';
+    statusEl.textContent = '⚠️ Could not fetch — check ticker symbol';
+    toast('Could not fetch ' + ticker + '. Is the ticker correct?', 'error');
   }
 
   btn.disabled = false;
@@ -1560,16 +1557,9 @@ async function saveInvestment() {
   if (!name) { toast('Enter a ticker symbol', 'error'); return; }
   if (!qty || qty <= 0) { toast('Enter a valid quantity', 'error'); return; }
 
-  // Pull prices: prefer manual override, then fetched
-  let currentPrice = null, buyPrice = null;
-  if (window._manualPrices) {
-    currentPrice = window._manualPrices.current;
-    buyPrice = window._manualPrices.buy;
-    window._manualPrices = null;
-  } else {
-    currentPrice = fetchBtn.dataset.fetchedCurrentPrice ? parseFloat(fetchBtn.dataset.fetchedCurrentPrice) : null;
-    buyPrice     = fetchBtn.dataset.fetchedBuyPrice     ? parseFloat(fetchBtn.dataset.fetchedBuyPrice)     : null;
-  }
+  // Pull prices: prefer what was fetched (which correctly separates buy vs current)
+  let currentPrice = fetchBtn.dataset.fetchedCurrentPrice ? parseFloat(fetchBtn.dataset.fetchedCurrentPrice) : null;
+  let buyPrice     = fetchBtn.dataset.fetchedBuyPrice     ? parseFloat(fetchBtn.dataset.fetchedBuyPrice)     : null;
 
   // If user manually edited the buy price field, honour it
   if (!isNaN(buyPriceEl) && buyPriceEl > 0) buyPrice = buyPriceEl;
@@ -1822,7 +1812,7 @@ function confirmReset() {
 
     // Fully reset state to defaults
     state = {
-      currency: 'MYR', darkMode: false, themeMode: 'light', hideNumbers: false,
+      currency: 'MYR', darkMode: true, themeMode: 'dark', hideNumbers: false,
       transactions: [], investments: [], goals: [], subscriptions: [], networthHistory: [],
       selectedTxnType: 'income', selectedGoalIcon: '🎯', editingGoalId: null, charts: {},
       onboardingDone: false, userName: '', monthlyIncome: 0, budgetLimit: 0,
@@ -1895,36 +1885,14 @@ function openModal(id) {
   document.getElementById(id).classList.add('open');
   // Only reset if opening fresh (not called from editX functions)
   if (id === 'add-txn-modal' && !document.getElementById('txn-edit-id').value) {
-    // Populate wallet selector
-    var walletSel = document.getElementById('txn-wallet');
-    var walletGroup = document.getElementById('txn-wallet-group');
-    if (walletSel) {
-      var accts = (state.accounts || []).filter(function(a){ return a.type !== 'liability'; });
-      if (accts.length === 0) {
-        // No wallets — show prompt to add one
-        walletSel.innerHTML = '<option value="">No wallets added yet</option>';
-        if (walletGroup) walletGroup.innerHTML =
-          '<div style="background:rgba(96,165,250,0.08);border:1px solid rgba(96,165,250,0.2);border-radius:10px;padding:10px 12px;font-size:12px">' +
-          '💡 <strong>Tip:</strong> Add a wallet (cash, bank account) to track where your money goes. ' +
-          '<span onclick="closeModal(\"add-txn-modal\");navigate(\"wallet\");" style="color:var(--blue);cursor:pointer;text-decoration:underline">Add a wallet →</span>' +
-          '</div>';
-      } else {
-        if (walletGroup) walletGroup.innerHTML =
-          '<label class="form-label">Wallet / Account <span style="color:var(--text-muted);font-weight:400;text-transform:none">(optional)</span></label>' +
-          '<select class="form-select" id="txn-wallet">' +
-          '<option value="">No specific wallet</option>' +
-          accts.map(function(a) {
-            return '<option value="' + a.id + '">' + (a.icon||'') + ' ' + a.name + ' (' + curr() + (a.balance||0).toLocaleString('en-MY',{maximumFractionDigits:0}) + ')</option>';
-          }).join('') +
-          '</select>';
-      }
-    }    document.getElementById('txn-modal-title').textContent = 'Add Transaction';
+    document.getElementById('txn-modal-title').textContent = 'Add Transaction';
     document.getElementById('txn-desc').value = '';
     document.getElementById('txn-amount').value = '';
     document.getElementById('txn-date').value = new Date().toISOString().slice(0,10);
     // Don't reset type here — caller (quickAddExpense/Income) sets it before openModal
     // Only default to income if no type has been set yet
     if (!state.selectedTxnType) selectTxnType('income');
+    populateTxnWalletDropdown('');
   }
   if (id === 'add-inv-modal' && !document.getElementById('inv-edit-id').value) {
     resetInvModal();
@@ -2065,7 +2033,22 @@ function parseYahooLive(text, invCurrency) {
 
 // Helper: build all proxy URLs for a Yahoo URL
 function yahooProxyUrls(yahooUrl) {
-  return [
+  // Extract ticker and period params for Cloudflare Worker route
+  const workerBase = 'https://wealthai.elwin653.workers.dev/price';
+  const tickerMatch = yahooUrl.match(/chart\/([^?]+)/);
+  const workerTicker = tickerMatch ? decodeURIComponent(tickerMatch[1]) : null;
+  const period1Match = yahooUrl.match(/period1=(\d+)/);
+  const period2Match = yahooUrl.match(/period2=(\d+)/);
+  let workerUrl = null;
+  if (workerTicker) {
+    workerUrl = `${workerBase}?ticker=${encodeURIComponent(workerTicker)}`;
+    if (period1Match && period2Match) {
+      workerUrl += `&period1=${period1Match[1]}&period2=${period2Match[1]}`;
+    }
+  }
+  const urls = [
+    // Cloudflare Worker — most reliable, no CORS issues, works on mobile
+    ...(workerUrl ? [workerUrl] : []),
     // corsproxy.io — often fastest and most reliable for Yahoo
     `https://corsproxy.io/?url=${encodeURIComponent(yahooUrl)}`,
     // allorigins query1
@@ -2077,6 +2060,7 @@ function yahooProxyUrls(yahooUrl) {
     // thingproxy as final fallback
     `https://thingproxy.freeboard.io/fetch/${yahooUrl}`,
   ];
+  return urls;
 }
 
 async function fetchYahooPrice(ticker, invCurrency) {
@@ -2616,6 +2600,7 @@ window.addTxnForCalDay = function() {
   setTimeout(() => {
     const dateEl = document.getElementById('txn-date');
     if (dateEl) dateEl.value = dateStr;
+    populateTxnWalletDropdown('');
   }, 50);
 };
 
@@ -2736,6 +2721,7 @@ window.quickAddExpense = function() {
   setTimeout(function() {
     selectTxnType('expense');
     document.getElementById('txn-date').value = new Date().toISOString().slice(0,10);
+    populateTxnWalletDropdown('');
   }, 10);
 };
 
@@ -2744,6 +2730,7 @@ window.quickAddIncome = function() {
   setTimeout(function() {
     selectTxnType('income');
     document.getElementById('txn-date').value = new Date().toISOString().slice(0,10);
+    populateTxnWalletDropdown('');
   }, 10);
 };
 
@@ -3133,9 +3120,7 @@ function buildFinancialContext() {
   var savRate = (mInc > 0) ? Math.round(((mInc - mExp) / mInc) * 100) : 0;
 
   // Keep context concise to avoid Groq token limits
-  var txnInstruction = '\n\nSPECIAL CAPABILITY: If the user wants to record a transaction, respond with a normal message AND include a JSON block at the end in this exact format (and nothing after it):\n[TXN:{"type":"income or expense","desc":"description","amount":123,"cat":"Food/Salary/Transport/Bills/Investment/Lifestyle/Other"}]\nOnly include the [TXN:...] block if the user explicitly asks to add/record/log a transaction.';
-
-  return txnInstruction + '\n\nFINANCIAL SNAPSHOT (' + new Date().toLocaleDateString() + ')\n' +
+  return 'FINANCIAL SNAPSHOT (' + new Date().toLocaleDateString() + ')\n' +
     'User: ' + (state.userName || 'User') + ' | Currency: ' + state.currency + '\n' +
     'Net Worth: ' + sym + getNetWorth().toLocaleString('en-US',{maximumFractionDigits:0}) + '\n' +
     'This Month: Income ' + sym + mInc.toLocaleString('en-US',{maximumFractionDigits:0}) +
@@ -3272,31 +3257,12 @@ window.sendAiMessage = async function() {
     }
 
     var typingEl = document.getElementById(typingId);
-    // Check for transaction intent in reply
-    var txnMatch = reply.match(/\[TXN:(\{[^}]+\})\]/);
-    var displayReply = reply.replace(/\[TXN:\{[^}]+\}\]/g, '').trim();
-    
+    // Safety: only update if this element is an assistant bubble (never a user bubble)
     if (typingEl && typingEl.classList.contains('ai-msg-assistant')) {
-      typingEl.querySelector('.ai-msg-bubble').innerHTML = escapeHtml(displayReply);
-      
-      // Show transaction confirmation card if AI detected intent
-      if (txnMatch) {
-        try {
-          var txnData = JSON.parse(txnMatch[1]);
-          var sym = curr();
-          var confirmHtml = '<div style="margin-top:10px;background:' + (txnData.type==='income'?'rgba(0,245,160,0.08)':'rgba(255,77,109,0.08)') + ';border:1px solid ' + (txnData.type==='income'?'rgba(0,245,160,0.3)':'rgba(255,77,109,0.3)') + ';border-radius:10px;padding:12px">' +
-            '<div style="font-size:12px;font-weight:600;margin-bottom:6px">' + (txnData.type==='income'?'💰 Add Income?':'💸 Add Expense?') + '</div>' +
-            '<div style="font-size:12px;color:var(--text-muted);margin-bottom:10px">' + txnData.desc + ' · ' + sym + (txnData.amount||0).toLocaleString('en-MY',{minimumFractionDigits:2}) + ' · ' + (txnData.cat||'Other') + '</div>' +
-            '<div style="display:flex;gap:8px">' +
-              '<button onclick="aiAddTransaction(' + JSON.stringify(txnData).replace(/"/g,"'") + ')" class="btn btn-primary btn-sm" style="flex:1;justify-content:center">✓ Add Transaction</button>' +
-              '<button onclick="this.parentElement.parentElement.remove()" class="btn btn-ghost btn-sm">Dismiss</button>' +
-            '</div>' +
-          '</div>';
-          typingEl.querySelector('.ai-msg-bubble').innerHTML += confirmHtml;
-        } catch(e) {}
-      }
+      typingEl.querySelector('.ai-msg-bubble').innerHTML = escapeHtml(reply);
     } else {
-      appendAiMessage('assistant', displayReply, false);
+      // Fallback: append a new assistant message
+      appendAiMessage('assistant', reply, false);
     }
 
     aiHistory.push({ role: 'model', parts: [{ text: reply }] });
@@ -3752,67 +3718,4 @@ window.deleteRecurringIncome = function(id) {
   save();
   window.renderRecurringIncome();
   toast('Recurring income removed', 'info');
-};
-
-// ── Manual price fallback for failed ticker fetches ───────
-window.applyManualPrices = function(ticker) {
-  var current = parseFloat(document.getElementById('inv-manual-current').value);
-  var buy = parseFloat(document.getElementById('inv-manual-buy').value);
-  if (!current || current <= 0) { toast('Enter a valid current price', 'error'); return; }
-  if (!buy || buy <= 0) buy = current;
-
-  var resultEl = document.getElementById('inv-fetch-result');
-  var saveBtn = document.getElementById('inv-save-btn');
-
-  // Store for saveInvestment to pick up
-  window._manualPrices = { current: current, buy: buy };
-
-  resultEl.innerHTML = '<div style="background:rgba(0,245,160,0.08);border:1px solid rgba(0,245,160,0.2);border-radius:10px;padding:12px;margin-top:8px">' +
-    '<div style="font-size:13px;font-weight:600;color:var(--green);margin-bottom:4px">✓ Manual prices set for ' + ticker + '</div>' +
-    '<div style="font-size:12px;color:var(--text-muted)">Current: ' + current + ' · Buy price: ' + buy + '</div>' +
-    '<div style="font-size:11px;color:var(--text-muted);margin-top:4px">Tap "Save Investment" to continue.</div>' +
-  '</div>';
-
-  if (saveBtn) saveBtn.style.display = 'block';
-  toast('Manual prices set — tap Save Investment', 'success');
-};
-
-// ── AI Transaction Recording ─────────────────────────────
-window.aiAddTransaction = function(txnData) {
-  if (!txnData || !txnData.amount) return;
-  var txn = {
-    id: uid(),
-    type: txnData.type || 'expense',
-    desc: txnData.desc || 'AI recorded transaction',
-    amount: parseFloat(txnData.amount) || 0,
-    cat: txnData.cat || 'Other',
-    date: new Date().toISOString().slice(0,10),
-    createdAt: Date.now()
-  };
-  state.transactions.push(txn);
-  save();
-  renderAll();
-  toast('✓ Transaction recorded: ' + txn.desc, 'success');
-};
-
-
-window.showSubTab = function(tab) {
-  var subsContent = document.querySelector('#page-subscriptions .page-header');
-  var riSection = document.getElementById('sub-recurring-income');
-  var subsList = document.getElementById('subscriptions-list') || document.querySelector('#page-subscriptions .card');
-  var btnSubs = document.getElementById('sub-tab-subs');
-  var btnIncome = document.getElementById('sub-tab-income');
-  if (tab === 'income') {
-    if (riSection) riSection.style.display = 'block';
-    // Hide subscriptions content (header area cards)
-    document.querySelectorAll('#page-subscriptions > *:not(#sub-recurring-income):not(#sub-tab-toggle)').forEach(function(el){ el.style.display = 'none'; });
-    if (btnSubs) { btnSubs.style.background = 'transparent'; btnSubs.style.color = 'var(--text-muted)'; }
-    if (btnIncome) { btnIncome.style.background = 'var(--bg-card)'; btnIncome.style.color = 'var(--text-primary)'; }
-    if (window.renderRecurringIncome) window.renderRecurringIncome();
-  } else {
-    if (riSection) riSection.style.display = 'none';
-    document.querySelectorAll('#page-subscriptions > *:not(#sub-recurring-income):not(#sub-tab-toggle)').forEach(function(el){ el.style.display = ''; });
-    if (btnSubs) { btnSubs.style.background = 'var(--bg-card)'; btnSubs.style.color = 'var(--text-primary)'; }
-    if (btnIncome) { btnIncome.style.background = 'transparent'; btnIncome.style.color = 'var(--text-muted)'; }
-  }
 };

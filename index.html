@@ -245,9 +245,10 @@
         </div>
         <div class="card" style="margin:0">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
-            <div class="chart-label" style="margin-bottom:0;font-size:11px">📅 Upcoming</div>
+            <div class="chart-label" style="margin-bottom:0;font-size:11px" data-i18n="insights">Insights</div>
+            <span class="badge badge-green" style="font-size:10px">AI</span>
           </div>
-          <div id="dash-upcoming"></div>
+          <div id="dash-insights"></div>
         </div>
       </div>
     </div>
@@ -492,29 +493,6 @@
 
     <!-- ═══════════════════ SUBSCRIPTIONS ═══════════════════ -->
     <div class="page" id="page-subscriptions">
-      <!-- Recurring Income tab within Subscriptions -->
-      <div id="sub-recurring-income" style="display:none;padding:16px 20px">
-        <div style="font-size:13px;color:var(--text-muted);margin-bottom:14px;line-height:1.5">Recurring income auto-creates an income transaction on the set day each month — salary, rental, dividends etc.</div>
-        <div id="recurring-income-list" style="margin-bottom:14px"></div>
-        <div class="card">
-          <div class="chart-label" style="margin-bottom:12px;font-size:12px">Add Recurring Income</div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
-            <div class="form-group" style="margin:0"><label class="form-label">Name</label><input type="text" id="ri-name" class="form-input" placeholder="e.g. Salary"></div>
-            <div class="form-group" style="margin:0"><label class="form-label">Amount</label><input type="number" id="ri-amount" class="form-input" placeholder="0.00" min="0" step="0.01"></div>
-          </div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">
-            <div class="form-group" style="margin:0"><label class="form-label">Day of month (1–28)</label><input type="number" id="ri-day" class="form-input" value="1" min="1" max="28"></div>
-            <div class="form-group" style="margin:0"><label class="form-label">Category</label>
-              <select id="ri-cat" class="form-select">
-                <option value="Salary">💼 Salary</option>
-                <option value="Investment">📈 Investment</option>
-                <option value="Other">📋 Other</option>
-              </select>
-            </div>
-          </div>
-          <button class="btn btn-primary btn-sm" onclick="addRecurringIncome()" style="width:100%;justify-content:center">+ Add</button>
-        </div>
-      </div>
       <div class="page-header">
         <div style="display:flex;align-items:center;justify-content:space-between">
           <div>
@@ -673,6 +651,38 @@
           </div>
         </div>
         <div id="gemini-key-status" style="font-size:12px;margin-top:4px"></div>
+      </div>
+
+      <!-- Recurring Income -->
+      <div class="card" style="margin-bottom:16px">
+        <div class="chart-label" style="margin-bottom:4px">💰 Recurring Income</div>
+        <div style="font-size:12px;color:var(--text-muted);margin-bottom:14px">Salary, rental, or any income that repeats monthly. Auto-adds a transaction on the set day each month.</div>
+        <div id="recurring-income-list" style="margin-bottom:14px"></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+          <div class="form-group" style="margin:0">
+            <label class="form-label">Name</label>
+            <input type="text" id="ri-name" class="form-input" placeholder="e.g. Salary">
+          </div>
+          <div class="form-group" style="margin:0">
+            <label class="form-label">Amount</label>
+            <input type="number" id="ri-amount" class="form-input" placeholder="0.00" min="0" step="0.01">
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">
+          <div class="form-group" style="margin:0">
+            <label class="form-label">Day of month (1-28)</label>
+            <input type="number" id="ri-day" class="form-input" value="1" min="1" max="28">
+          </div>
+          <div class="form-group" style="margin:0">
+            <label class="form-label">Category</label>
+            <select id="ri-cat" class="form-select">
+              <option value="Salary">💼 Salary</option>
+              <option value="Investment">📈 Investment</option>
+              <option value="Other">📋 Other</option>
+            </select>
+          </div>
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="addRecurringIncome()" style="width:100%;justify-content:center">+ Add Recurring Income</button>
       </div>
 
       <!-- Data Management -->
@@ -982,12 +992,10 @@
         <label class="form-label">Date</label>
         <input type="date" class="form-input" id="txn-date">
       </div>
-      <div class="form-group" id="txn-wallet-group">
-        <label class="form-label">Wallet / Account <span style="color:var(--text-muted);font-weight:400;text-transform:none">(optional)</span></label>
-        <select class="form-select" id="txn-wallet">
-          <option value="">No specific wallet</option>
-        </select>
-      </div>
+    </div>
+    <div class="form-group" id="txn-wallet-group">
+      <label class="form-label">Wallet <span style="font-size:11px;color:var(--text-muted)">(optional)</span></label>
+      <div id="txn-wallet-wrap"></div>
     </div>
     <div style="display:flex;gap:10px;margin-top:8px">
       <button class="btn btn-ghost" onclick="closeModal('add-txn-modal')" style="flex:1">Cancel</button>
