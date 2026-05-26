@@ -1514,8 +1514,24 @@ async function invFetchPrice() {
 
   } catch(e) {
     console.error('Fetch error:', e);
-    statusEl.textContent = '⚠️ Could not fetch — check ticker symbol';
-    toast('Could not fetch ' + ticker + '. Is the ticker correct?', 'error');
+    // Show a helpful error card — user can still enter prices manually
+    resultEl.style.display = 'block';
+    resultEl.style.borderColor = 'var(--red)';
+    resultEl.innerHTML =
+      '<div style="display:flex;align-items:flex-start;gap:10px">' +
+        '<span style="font-size:20px">⚠️</span>' +
+        '<div>' +
+          '<div style="font-weight:600;color:var(--red);margin-bottom:4px">Could not fetch "' + ticker + '"</div>' +
+          '<div style="font-size:12px;color:var(--text-muted);margin-bottom:8px">This could be a wrong ticker symbol or a network issue. Common examples: ' +
+            '<code style="background:var(--bg-elevated);padding:1px 5px;border-radius:4px">AAPL</code> ' +
+            '<code style="background:var(--bg-elevated);padding:1px 5px;border-radius:4px">MSFT</code> ' +
+            '<code style="background:var(--bg-elevated);padding:1px 5px;border-radius:4px">VOO</code> ' +
+            '<code style="background:var(--bg-elevated);padding:1px 5px;border-radius:4px">BTC</code>' +
+          '</div>' +
+          '<div style="font-size:12px;color:var(--text-primary)">💡 You can still save by entering the <strong>Buy Price</strong> manually below, then clicking <strong>Save Investment</strong>.</div>' +
+        '</div>' +
+      '</div>';
+    statusEl.textContent = '⚠️ Fetch failed — enter buy price manually below to save anyway';
   }
 
   btn.disabled = false;
@@ -1892,7 +1908,16 @@ function openModal(id) {
     // Don't reset type here — caller (quickAddExpense/Income) sets it before openModal
     // Only default to income if no type has been set yet
     if (!state.selectedTxnType) selectTxnType('income');
-    populateTxnWalletDropdown('');
+  }
+  // Always repopulate wallet dropdown when txn modal opens (fresh or edit)
+  if (id === 'add-txn-modal') {
+    var editId = document.getElementById('txn-edit-id').value;
+    if (editId) {
+      var t = state.transactions.find(function(x){ return x.id === editId; });
+      populateTxnWalletDropdown(t ? (t.walletId || '') : '');
+    } else {
+      populateTxnWalletDropdown('');
+    }
   }
   if (id === 'add-inv-modal' && !document.getElementById('inv-edit-id').value) {
     resetInvModal();
@@ -1918,6 +1943,10 @@ function openModal(id) {
 
 function closeModal(id) {
   document.getElementById(id).classList.remove('open');
+  // Clear edit state so next fresh open doesn't see stale ID
+  if (id === 'add-txn-modal') {
+    document.getElementById('txn-edit-id').value = '';
+  }
 }
 
 // Close on overlay click
@@ -3119,6 +3148,11 @@ function buildFinancialContext() {
   // Savings rate
   var savRate = (mInc > 0) ? Math.round(((mInc - mExp) / mInc) * 100) : 0;
 
+  // Wallets
+  var walletsStr = (state.accounts || []).map(function(a) {
+    return '"' + a.name + '" (' + a.type + ', balance: ' + sym + (a.balance||0).toFixed(0) + ')';
+  }).join(', ') || 'No wallets';
+
   // Keep context concise to avoid Groq token limits
   return 'FINANCIAL SNAPSHOT (' + new Date().toLocaleDateString() + ')\n' +
     'User: ' + (state.userName || 'User') + ' | Currency: ' + state.currency + '\n' +
@@ -3132,10 +3166,108 @@ function buildFinancialContext() {
       ' | Holdings: ' + (state.investments.map(function(i){return i.name;}).join(', ')||'None') + '\n' +
     'Goals: ' + goalsStr + '\n' +
     'Subscriptions: ' + subsStr + '\n' +
+    'Wallets: ' + walletsStr + '\n' +
     'Recent transactions: ' + txns.slice(0,5).map(function(t){
       return t.date+' '+t.type+' '+t.desc+' '+sym+t.amount.toFixed(0)+' ('+t.cat+')';
     }).join('; ');
 }
+
+// ── AI Transaction Card ───────────────────────────────────
+function buildAiTxnCard(txnData) {
+  var sym = curr();
+  var isIncome = txnData.type === 'income';
+  var color = isIncome ? 'var(--green)' : 'var(--red)';
+  var bg = isIncome ? 'rgba(52,211,153,0.10)' : 'rgba(248,113,113,0.10)';
+  var sign = isIncome ? '+' : '−';
+
+  // Find matching wallet
+  var walletLabel = 'No wallet';
+  var matchedWalletId = '';
+  if (txnData.walletName && (state.accounts || []).length) {
+    var needle = (txnData.walletName || '').toLowerCase();
+    var best = state.accounts.reduce(function(found, a) {
+      var score = 0;
+      var aName = a.name.toLowerCase();
+      if (aName === needle) score = 100;
+      else if (aName.includes(needle) || needle.includes(aName)) score = 50;
+      else {
+        // word overlap
+        var words = needle.split(/\s+/);
+        words.forEach(function(w) { if (w.length > 2 && aName.includes(w)) score += 10; });
+      }
+      return (score > (found.score || 0)) ? { account: a, score: score } : found;
+    }, { account: null, score: 0 });
+    if (best.account && best.score > 0) {
+      matchedWalletId = best.account.id;
+      walletLabel = (best.account.icon || '') + ' ' + best.account.name;
+    }
+  }
+
+  // Encode txnData + walletId for the onclick
+  var payload = JSON.stringify({
+    type: txnData.type,
+    desc: txnData.desc || '',
+    amount: txnData.amount || 0,
+    cat: txnData.cat || 'Other',
+    walletId: matchedWalletId
+  }).replace(/'/g, '&apos;');
+
+  return '<div style="margin-top:12px;background:' + bg + ';border:1.5px solid ' + color + ';border-radius:12px;padding:14px">' +
+    '<div style="font-size:11px;font-weight:700;color:' + color + ';text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px">📋 Transaction to Add</div>' +
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:10px">' +
+      '<div style="font-size:12px;color:var(--text-muted)">Type</div>' +
+      '<div style="font-size:12px;font-weight:600;color:' + color + '">' + (isIncome ? '↑ Income' : '↓ Expense') + '</div>' +
+      '<div style="font-size:12px;color:var(--text-muted)">Description</div>' +
+      '<div style="font-size:12px;font-weight:600">' + (txnData.desc || '') + '</div>' +
+      '<div style="font-size:12px;color:var(--text-muted)">Amount</div>' +
+      '<div style="font-size:13px;font-weight:700;color:' + color + '">' + sign + sym + parseFloat(txnData.amount || 0).toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2}) + '</div>' +
+      '<div style="font-size:12px;color:var(--text-muted)">Category</div>' +
+      '<div style="font-size:12px;font-weight:600">' + (txnData.cat || 'Other') + '</div>' +
+      '<div style="font-size:12px;color:var(--text-muted)">Wallet</div>' +
+      '<div style="font-size:12px;font-weight:600">' + walletLabel + '</div>' +
+    '</div>' +
+    '<div style="display:flex;gap:8px">' +
+      '<button onclick="confirmAiTransaction(\'' + payload.replace(/\\/g,'\\\\').replace(/"/g,'&quot;') + '\')" ' +
+        'style="flex:2;padding:8px 14px;background:' + color + ';color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer">✅ Add Transaction</button>' +
+      '<button onclick="this.closest(\'[style*=border]\').remove()" ' +
+        'style="flex:1;padding:8px 10px;background:var(--bg-elevated);color:var(--text-muted);border:1px solid var(--border);border-radius:8px;font-size:13px;cursor:pointer">✗ Cancel</button>' +
+    '</div>' +
+  '</div>';
+}
+
+window.confirmAiTransaction = function(payloadStr) {
+  try {
+    var txnData = JSON.parse(payloadStr.replace(/&apos;/g,"'").replace(/&quot;/g,'"'));
+    var today = new Date().toISOString().slice(0,10);
+    var newTxn = {
+      id: uid(),
+      type: txnData.type,
+      desc: txnData.desc,
+      amount: parseFloat(txnData.amount) || 0,
+      cat: txnData.cat || 'Other',
+      date: today,
+      createdAt: Date.now()
+    };
+    if (txnData.walletId) {
+      newTxn.walletId = txnData.walletId;
+      var wa = (state.accounts || []).find(function(a){ return a.id === txnData.walletId; });
+      if (wa) wa.balance += (txnData.type === 'income' ? newTxn.amount : -newTxn.amount);
+    }
+    state.transactions.push(newTxn);
+    save();
+    renderAll();
+    // Replace the confirm card with a success message
+    var sym = curr();
+    var sign = txnData.type === 'income' ? '+' : '−';
+    event.target.closest('[style*="border"]').outerHTML =
+      '<div style="margin-top:10px;padding:10px 14px;background:rgba(52,211,153,0.12);border:1px solid var(--green);border-radius:10px;font-size:13px;color:var(--green);font-weight:600">' +
+        '✅ Transaction added: ' + sign + sym + parseFloat(txnData.amount).toLocaleString('en-US',{minimumFractionDigits:2}) + ' — ' + txnData.desc +
+      '</div>';
+    toast('Transaction added via AI ✓', 'success');
+  } catch(e) {
+    toast('Could not add transaction — please try again', 'error');
+  }
+};
 
 var _aiMsgCounter = 0;
 function appendAiMessage(role, text, isStreaming) {
@@ -3189,7 +3321,17 @@ window.sendAiMessage = async function() {
     var systemPrompt = 'You are a friendly, expert personal financial advisor inside WealthOS finance app. ' +
       'You have the user real financial data below. Give specific, actionable advice based on their actual numbers. ' +
       'Be concise but thorough. Use bullet points where helpful. ' +
-      'Always reference their specific amounts. Be encouraging but honest.' +
+      'Always reference their specific amounts. Be encouraging but honest.\n\n' +
+      'TRANSACTION RECORDING: When the user asks you to add/record a transaction, output a special block at the END of your message in EXACTLY this format (all on one line, no line breaks inside the brackets):\n' +
+      '[TXN:{"type":"income","desc":"From parents","amount":500,"cat":"Other","walletName":"Maybank 123"}]\n' +
+      'Rules for the TXN block:\n' +
+      '- type: must be "income" or "expense"\n' +
+      '- desc: short description of the transaction\n' +
+      '- amount: positive number only, no currency symbol\n' +
+      '- cat: MUST be one of exactly: Salary, Food, Transport, Bills, Investment, Lifestyle, Other\n' +
+      '- walletName: the wallet name the user mentioned (match to their wallet list below), omit this field if no wallet mentioned\n' +
+      '- Only include ONE [TXN:{...}] block per response\n' +
+      '- Always confirm the details in plain text before the block\n\n' +
       buildFinancialContext();
 
     // Try multiple model names in case one is unavailable
@@ -3259,7 +3401,22 @@ window.sendAiMessage = async function() {
     var typingEl = document.getElementById(typingId);
     // Safety: only update if this element is an assistant bubble (never a user bubble)
     if (typingEl && typingEl.classList.contains('ai-msg-assistant')) {
-      typingEl.querySelector('.ai-msg-bubble').innerHTML = escapeHtml(reply);
+      // Check for [TXN:{...}] block before rendering
+      var txnMatch = reply.match(/\[TXN:(\{[\s\S]*?\})\]/);
+      var displayReply = reply;
+      if (txnMatch) {
+        // Strip the raw [TXN:...] block from visible text
+        displayReply = reply.replace(/\[TXN:\{[\s\S]*?\}\]/, '').trim();
+        try {
+          var txnData = JSON.parse(txnMatch[1]);
+          var confirmHtml = buildAiTxnCard(txnData);
+          typingEl.querySelector('.ai-msg-bubble').innerHTML = escapeHtml(displayReply) + confirmHtml;
+        } catch(parseErr) {
+          typingEl.querySelector('.ai-msg-bubble').innerHTML = escapeHtml(displayReply);
+        }
+      } else {
+        typingEl.querySelector('.ai-msg-bubble').innerHTML = escapeHtml(reply);
+      }
     } else {
       // Fallback: append a new assistant message
       appendAiMessage('assistant', reply, false);
