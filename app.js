@@ -714,19 +714,21 @@ function renderInvestments() {
     var liveTime = i.lastUpdated ? new Date(i.lastUpdated).toLocaleTimeString('en-MY',{hour:'2-digit',minute:'2-digit'}) : '';
 
     return '<tr>' +
-      // Asset (sticky on mobile)
+      // Asset — includes type badge + qty as sub-text (visible on mobile since those columns are hidden)
       '<td class="td-primary">' +
         '<div style="display:flex;align-items:center;gap:7px">' +
           '<span class="type-dot" style="background:' + col + ';flex-shrink:0"></span>' +
-          '<div><div style="font-weight:700">' + i.name + '</div>' +
-          '<div style="font-size:10px;color:var(--text-muted)">' + iCurr + '</div></div>' +
+          '<div>' +
+            '<div style="font-weight:700">' + i.name + '</div>' +
+            '<div style="font-size:10px;color:var(--text-muted)">' + iCurr + ' · ' + i.type.toUpperCase() + ' · ' + i.qty.toLocaleString() + '</div>' +
+          '</div>' +
         '</div>' +
       '</td>' +
-      // Type
+      // Type (hidden on mobile via CSS)
       '<td><span class="badge badge-blue">' + i.type.toUpperCase() + '</span></td>' +
-      // Qty
+      // Qty (hidden on mobile via CSS)
       '<td class="td-mono">' + i.qty.toLocaleString() + '</td>' +
-      // Buy Price
+      // Buy Price (hidden on mobile via CSS)
       '<td class="td-mono">' + fmtInv(i.buyPrice, iCurr, priceDecimals) + '</td>' +
       // Current Price
       '<td>' +
@@ -735,15 +737,15 @@ function renderInvestments() {
           (i.lastUpdated && !i.fetchFailed ? '<span class="live-dot"></span>' : '') +
         '</div>' +
         (i.fetchFailed
-          ? '<div style="font-size:10px;color:var(--red);margin-top:1px">⚠️ Manual · <span style="cursor:pointer;text-decoration:underline" onclick="openManualPriceEdit(\'' + i.id + '\')">Update</span></div>'
+          ? '<div style="font-size:10px;color:var(--red);margin-top:1px">⚠️ <span style="cursor:pointer;text-decoration:underline" onclick="openManualPriceEdit(\'' + i.id + '\')">Update</span></div>'
           : (i.lastUpdated ? '<div style="font-size:10px;color:var(--text-muted);margin-top:1px">Live · ' + liveTime + '</div>' : '<div style="font-size:10px;color:var(--text-muted);margin-top:1px">Manual</div>')) +
       '</td>' +
       // Value
       '<td class="td-mono td-primary">' + fmtInv(val, iCurr) + '</td>' +
-      // P&L
+      // P&L — dollar amount has class so it can be hidden on mobile, only % shown
       '<td>' +
-        '<span class="td-mono" style="font-size:12px;font-weight:700;color:' + pnlColor + '">' + pnlSign + fmtInv(pnl, iCurr) + '</span>' +
-        '<div style="font-size:10px;font-weight:600;color:' + pnlColor + ';margin-top:1px">' + pnlSign + pnlPct.toFixed(2) + '%</div>' +
+        '<span class="td-mono pnl-amount" style="font-size:12px;font-weight:700;color:' + pnlColor + '">' + pnlSign + fmtInv(pnl, iCurr) + '</span>' +
+        '<div style="font-size:11px;font-weight:700;color:' + pnlColor + ';margin-top:1px">' + pnlSign + pnlPct.toFixed(2) + '%</div>' +
       '</td>' +
       // Actions
       '<td>' +

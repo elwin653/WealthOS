@@ -1179,26 +1179,34 @@ td.td-mono { font-family: 'DM Mono', monospace; font-size: 13px; }
   gap: 12px;
 }
 @media (max-width: 900px) {
-  .inv-stats-grid {
-    grid-template-columns: 1fr 1fr;
-  }
-  /* On mobile: show the table inside a horizontal scroll wrapper */
-  .inv-table-desktop { display: block !important; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .inv-stats-grid { grid-template-columns: 1fr 1fr; }
+
+  /* Remove horizontal scroll — table must fit the screen */
+  .inv-table-desktop { display: block !important; overflow-x: visible; }
   #page-investments .card { padding: 0; overflow: hidden; }
-  /* Stick the asset column on mobile so users can always see what row they're on */
-  #inv-table th:first-child,
-  #inv-table td:first-child {
-    position: sticky;
-    left: 0;
-    background: var(--bg-card);
-    z-index: 1;
-    box-shadow: 2px 0 6px rgba(0,0,0,0.06);
-  }
-  #inv-table thead th:first-child { background: var(--bg-elevated); }
-  /* Compact cell padding on mobile */
-  #inv-table td, #inv-table th { padding: 10px 10px; white-space: nowrap; font-size: 12px; }
+
+  /* Hide non-essential columns on mobile — Type, Qty, Buy Price */
+  #inv-table th:nth-child(2),
+  #inv-table td:nth-child(2),
+  #inv-table th:nth-child(3),
+  #inv-table td:nth-child(3),
+  #inv-table th:nth-child(4),
+  #inv-table td:nth-child(4) { display: none; }
+
+  /* Compact remaining columns */
+  #inv-table td, #inv-table th { padding: 10px 8px; font-size: 12px; }
+
+  /* Asset column: slightly wider to fit name + meta */
+  #inv-table td:first-child, #inv-table th:first-child { min-width: 90px; }
+
+  /* P&L column — only show percentage, hide dollar amount */
+  #inv-table td:nth-child(7) .pnl-amount { display: none; }
+
+  /* Actions column — tighter */
+  #inv-table td:last-child { padding: 10px 4px; }
 }
 @media (min-width: 901px) {
-  /* Desktop: hide mobile-only list, show normal table */
   #inv-list-mobile { display: none; }
+  /* Desktop: show P&L amount */
+  .pnl-amount { display: inline; }
 }
