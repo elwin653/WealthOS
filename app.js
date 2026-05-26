@@ -3667,16 +3667,16 @@ window.renderWallet = function() {
   if (!el) return;
 
   el.innerHTML =
-    // Net worth summary — Deep Teal
-    '<div class="card" style="margin-bottom:14px;background:#0a4a3a;border-color:#0f6e56">' +
-      '<div style="font-size:10px;font-weight:700;color:#5DCAA5;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:6px">Total Net Worth</div>' +
-      '<div style="font-size:28px;font-weight:700;color:#ffffff;margin-bottom:12px">' + sym + netWorth.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}) + '</div>' +
+    // Net worth summary — white card with green top accent
+    '<div class="card" style="margin-bottom:14px;background:var(--bg-card);border-top:4px solid #1D9E75;border-radius:0 0 14px 14px">' +
+      '<div style="font-size:10px;font-weight:700;color:#0F6E56;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:6px">Total Net Worth</div>' +
+      '<div style="font-size:28px;font-weight:700;color:var(--text-primary);margin-bottom:12px">' + sym + netWorth.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}) + '</div>' +
       '<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px">' +
-        '<div style="font-size:12px;color:#9FE1CB">Cash <span style="color:#fff;font-weight:600">' + sym + totalCash.toLocaleString('en-US',{maximumFractionDigits:0}) + '</span></div>' +
-        '<div style="font-size:12px;color:#9FE1CB">Banks <span style="color:#fff;font-weight:600">' + sym + totalBank.toLocaleString('en-US',{maximumFractionDigits:0}) + '</span></div>' +
-        '<div style="font-size:12px;color:#9FE1CB">Investments <span style="color:#fff;font-weight:600">' + sym + totalInvest.toLocaleString('en-US',{maximumFractionDigits:0}) + '</span></div>' +
-        '<div style="font-size:12px;color:#9FE1CB">Assets <span style="color:#fff;font-weight:600">' + sym + totalAssets.toLocaleString('en-US',{maximumFractionDigits:0}) + '</span></div>' +
-        '<div style="font-size:12px;color:#9FE1CB">Liabilities <span style="color:#FF9999;font-weight:600">-' + sym + totalLiab.toLocaleString('en-US',{maximumFractionDigits:0}) + '</span></div>' +
+        '<div style="font-size:12px;color:var(--text-muted)">Cash <span style="color:var(--text-primary);font-weight:600">' + sym + totalCash.toLocaleString('en-US',{maximumFractionDigits:0}) + '</span></div>' +
+        '<div style="font-size:12px;color:var(--text-muted)">Banks <span style="color:var(--text-primary);font-weight:600">' + sym + totalBank.toLocaleString('en-US',{maximumFractionDigits:0}) + '</span></div>' +
+        '<div style="font-size:12px;color:var(--text-muted)">Investments <span style="color:var(--text-primary);font-weight:600">' + sym + totalInvest.toLocaleString('en-US',{maximumFractionDigits:0}) + '</span></div>' +
+        '<div style="font-size:12px;color:var(--text-muted)">Assets <span style="color:var(--text-primary);font-weight:600">' + sym + totalAssets.toLocaleString('en-US',{maximumFractionDigits:0}) + '</span></div>' +
+        '<div style="font-size:12px;color:var(--text-muted)">Liabilities <span style="color:var(--red);font-weight:600">-' + sym + totalLiab.toLocaleString('en-US',{maximumFractionDigits:0}) + '</span></div>' +
       '</div>' +
     '</div>' +
     section('Cash on Hand', '💵', cash, totalCash, '+ Add Cash', 'cash') +
