@@ -174,6 +174,18 @@ function fmt(n, decimals = 2) {
   return (n < 0 ? '-' : '') + curr() + formatted;
 }
 
+// Compact format for stat cards — abbreviates large numbers so they fit
+function fmtCompact(n) {
+  if (n === null || n === undefined || isNaN(n)) return curr() + '0';
+  var sym = curr();
+  var abs = Math.abs(n);
+  var sign = n < 0 ? '-' : '';
+  if (abs >= 1e9)  return sign + sym + (abs / 1e9).toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2}) + 'B';
+  if (abs >= 1e6)  return sign + sym + (abs / 1e6).toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2}) + 'M';
+  if (abs >= 1000) return sign + sym + (abs / 1000).toLocaleString('en-US', {minimumFractionDigits:1, maximumFractionDigits:1}) + 'K';
+  return sign + sym + abs.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
+}
+
 function fmtFull(n) {
   return curr() + Math.abs(n).toLocaleString('en-MY', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
@@ -263,8 +275,15 @@ function toggleDarkMode() {
 }
 
 function updateHeaderThemeBtn() {
-  var btn = document.getElementById('header-theme-btn');
-  if (btn) btn.textContent = state.darkMode ? '☀️' : '🌙';
+  var isDark = state.darkMode;
+  // Mobile header button
+  var mBtn = document.getElementById('header-theme-btn');
+  if (mBtn) mBtn.textContent = isDark ? '☀️' : '🌙';
+  // Desktop sidebar button
+  var icon = document.getElementById('sidebar-theme-icon');
+  var label = document.getElementById('sidebar-theme-label');
+  if (icon) icon.textContent = isDark ? '☀️' : '🌙';
+  if (label) label.textContent = isDark ? 'Light Mode' : 'Dark Mode';
 }
 
 // ── Navigation ───────────────────────────────────────────
@@ -684,9 +703,9 @@ function renderInvestments() {
 
   const hasMixed = state.investments.some(i => (i.invCurrency||state.currency) !== state.currency);
   document.getElementById('inv-stats').innerHTML = [
-    { label: 'Total Invested', value: hasMixed ? '~'+fmt(invested) : fmt(invested), sub: hasMixed ? 'Mixed currencies' : '', color: 'var(--blue)', accent: 'var(--blue)' },
-    { label: 'Current Value', value: hasMixed ? '~'+fmt(total) : fmt(total), sub: '', color: 'var(--text-primary)', accent: 'var(--green)' },
-    { label: 'Total P&L', value: `${pnl>=0?'+':''}${fmt(pnl)}`, sub: `${pnlPct>=0?'+':''}${pnlPct.toFixed(2)}%`, color: pnl>=0?'var(--green)':'var(--red)', accent: pnl>=0?'var(--green)':'var(--red)' },
+    { label: 'Total Invested', value: (hasMixed ? '~' : '') + fmtCompact(invested), sub: hasMixed ? 'Mixed currencies' : '', color: 'var(--blue)', accent: 'var(--blue)' },
+    { label: 'Current Value', value: (hasMixed ? '~' : '') + fmtCompact(total), sub: '', color: 'var(--text-primary)', accent: 'var(--green)' },
+    { label: 'Total P&L', value: `${pnl>=0?'+':''}${fmtCompact(pnl)}`, sub: `${pnlPct>=0?'+':''}${pnlPct.toFixed(2)}%`, color: pnl>=0?'var(--green)':'var(--red)', accent: pnl>=0?'var(--green)':'var(--red)' },
     { label: 'Best Performer', value: best ? best.name : '—', sub: best ? `+${best.pct.toFixed(1)}%` : '', color: 'var(--green)', accent: 'var(--amber)' }
   ].map(s => `
     <div class="stat-card" style="--accent-color:${s.accent}">
