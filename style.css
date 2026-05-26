@@ -1182,11 +1182,23 @@ td.td-mono { font-family: 'DM Mono', monospace; font-size: 13px; }
   .inv-stats-grid {
     grid-template-columns: 1fr 1fr;
   }
-  .inv-table-desktop { display: none; }
-  #page-investments .card { padding: 0; background: transparent; border: none; box-shadow: none; }
-  #page-investments .page-header { padding-bottom: 0; }
+  /* On mobile: show the table inside a horizontal scroll wrapper */
+  .inv-table-desktop { display: block !important; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  #page-investments .card { padding: 0; overflow: hidden; }
+  /* Stick the asset column on mobile so users can always see what row they're on */
+  #inv-table th:first-child,
+  #inv-table td:first-child {
+    position: sticky;
+    left: 0;
+    background: var(--bg-card);
+    z-index: 1;
+    box-shadow: 2px 0 6px rgba(0,0,0,0.06);
+  }
+  #inv-table thead th:first-child { background: var(--bg-elevated); }
+  /* Compact cell padding on mobile */
+  #inv-table td, #inv-table th { padding: 10px 10px; white-space: nowrap; font-size: 12px; }
 }
 @media (min-width: 901px) {
-  /* Desktop: show normal table */
-  #inv-table tr td[colspan="8"] { display: none; } /* hide mobile cards */
+  /* Desktop: hide mobile-only list, show normal table */
+  #inv-list-mobile { display: none; }
 }
