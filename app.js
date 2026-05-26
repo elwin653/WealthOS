@@ -2942,7 +2942,7 @@ function processSubscriptionCharges() {
           type: 'expense',
           desc: sub.name + ' (auto)',
           amount: sub.amount,
-          cat: sub.cat || 'Bills',
+          cat: sub.cat ? (sub.cat.charAt(0).toUpperCase() + sub.cat.slice(1)) : 'Bills',
           date: sub.renewal,
           subId: sub.id
         });
