@@ -245,6 +245,8 @@ function applyTheme() {
   document.body.classList.toggle('light-mode', !isDark);
   // Update legacy darkMode for backward compat
   state.darkMode = isDark;
+  // Keep header button icon in sync
+  updateHeaderThemeBtn();
 }
 
 // Listen for system theme changes when in system mode
@@ -257,6 +259,12 @@ function toggleDarkMode() {
   state.themeMode = state.darkMode ? 'dark' : 'light';
   applyTheme();
   save();
+  updateHeaderThemeBtn();
+}
+
+function updateHeaderThemeBtn() {
+  var btn = document.getElementById('header-theme-btn');
+  if (btn) btn.textContent = state.darkMode ? '☀️' : '🌙';
 }
 
 // ── Navigation ───────────────────────────────────────────

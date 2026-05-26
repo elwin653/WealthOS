@@ -1181,32 +1181,50 @@ td.td-mono { font-family: 'DM Mono', monospace; font-size: 13px; }
 @media (max-width: 900px) {
   .inv-stats-grid { grid-template-columns: 1fr 1fr; }
 
-  /* Remove horizontal scroll — table must fit the screen */
-  .inv-table-desktop { display: block !important; overflow-x: visible; }
+  /* Contain the table — no horizontal scroll ever */
+  .inv-table-desktop { display: block !important; overflow: hidden; width: 100%; }
   #page-investments .card { padding: 0; overflow: hidden; }
 
-  /* Hide non-essential columns on mobile — Type, Qty, Buy Price */
-  #inv-table th:nth-child(2),
-  #inv-table td:nth-child(2),
-  #inv-table th:nth-child(3),
-  #inv-table td:nth-child(3),
-  #inv-table th:nth-child(4),
-  #inv-table td:nth-child(4) { display: none; }
+  /* Force table to fit its container exactly */
+  #page-investments table {
+    table-layout: fixed;
+    width: 100% !important;
+  }
 
-  /* Compact remaining columns */
-  #inv-table td, #inv-table th { padding: 10px 8px; font-size: 12px; }
+  /* Hide non-essential columns: Type(2), Qty(3), Buy Price(4) */
+  #inv-table th:nth-child(2), #inv-table td:nth-child(2),
+  #inv-table th:nth-child(3), #inv-table td:nth-child(3),
+  #inv-table th:nth-child(4), #inv-table td:nth-child(4) { display: none; }
 
-  /* Asset column: slightly wider to fit name + meta */
-  #inv-table td:first-child, #inv-table th:first-child { min-width: 90px; }
+  /* Assign fixed % widths to the 5 visible columns */
+  #inv-table th:nth-child(1), #inv-table td:nth-child(1) { width: 28%; } /* Asset */
+  #inv-table th:nth-child(5), #inv-table td:nth-child(5) { width: 26%; } /* Current Price */
+  #inv-table th:nth-child(6), #inv-table td:nth-child(6) { width: 22%; } /* Value */
+  #inv-table th:nth-child(7), #inv-table td:nth-child(7) { width: 14%; } /* P&L */
+  #inv-table th:nth-child(8), #inv-table td:nth-child(8) { width: 10%; } /* Actions */
 
-  /* P&L column — only show percentage, hide dollar amount */
-  #inv-table td:nth-child(7) .pnl-amount { display: none; }
+  /* Prevent any cell text from blowing out its column */
+  #inv-table td, #inv-table th {
+    padding: 8px 6px;
+    font-size: 11px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
 
-  /* Actions column — tighter */
-  #inv-table td:last-child { padding: 10px 4px; }
+  /* Asset cell: allow name sub-text to wrap */
+  #inv-table td:first-child { white-space: normal; }
+  #inv-table td:first-child .td-primary { word-break: break-word; }
+
+  /* P&L: hide dollar amount, show only % */
+  #inv-table .pnl-amount { display: none; }
+
+  /* Actions: minimum padding */
+  #inv-table td:last-child { padding: 8px 2px; }
+  #inv-table td:last-child .btn-icon { padding: 4px; }
+  #inv-table td:last-child svg { width: 12px !important; height: 12px !important; }
 }
 @media (min-width: 901px) {
   #inv-list-mobile { display: none; }
-  /* Desktop: show P&L amount */
   .pnl-amount { display: inline; }
 }
