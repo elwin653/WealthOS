@@ -2306,6 +2306,19 @@ async function fetchCryptoPrice(ticker, invCurrency) {
   const t = ticker.toUpperCase();
   if (!CRYPTO_IDS[t]) throw new Error('Unknown crypto: ' + ticker + '. Supported: BTC, ETH, SOL, BNB, XRP, ADA, DOGE...');
   const symbol = toBinanceSymbol(t);
+
+  // Try Cloudflare Worker first (works on mobile — no CORS issues)
+  try {
+    const workerUrl = `https://wealthai.elwin653.workers.dev/price?ticker=${encodeURIComponent(t)}`;
+    const res = await fetch(workerUrl, { signal: AbortSignal.timeout(12000) });
+    if (res.ok) {
+      const data = await res.json();
+      const priceUsd = parseFloat(data?.price);
+      if (priceUsd > 0) return toInvCurrency(priceUsd, invCurrency);
+    }
+  } catch(e) { /* fall through to direct Binance */ }
+
+  // Fallback: direct Binance (works on desktop)
   const url = `https://api.binance.com/api/v3/ticker/price?symbol=${symbol}`;
   const res = await fetch(url, { signal: AbortSignal.timeout(10000) });
   if (!res.ok) throw new Error('Binance error ' + res.status);
@@ -2324,9 +2337,23 @@ async function fetchCryptoHistorical(ticker, date, invCurrency) {
   // Try exact date first, then search forward up to 30 days
   // (handles weekends, holidays, and pre-listing dates)
   const startTime = date.getTime();
+  const period2 = startTime + 7 * 86400000;
 
-  // First attempt: exact date window (7 days forward to catch any gaps)
-  const url1 = `https://api.binance.com/api/v3/klines?symbol=${symbol}&interval=1d&startTime=${startTime}&endTime=${startTime + 7 * 86400000}&limit=5`;
+  // Try Worker first (mobile-safe, no CORS)
+  try {
+    const workerUrl = `https://wealthai.elwin653.workers.dev/price?ticker=${encodeURIComponent(t)}&period1=${Math.floor(startTime/1000)}&period2=${Math.floor(period2/1000)}`;
+    const res = await fetch(workerUrl, { signal: AbortSignal.timeout(12000) });
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data) && data.length) {
+        const closePrice = parseFloat(data[0][4]);
+        if (closePrice > 0) return toInvCurrency(closePrice, invCurrency);
+      }
+    }
+  } catch(e) { /* fall through */ }
+
+  // Fallback: direct Binance (desktop)
+  const url1 = `https://api.binance.com/api/v3/klines?symbol=${symbol}&interval=1d&startTime=${startTime}&endTime=${period2}&limit=5`;
   let res = await fetch(url1, { signal: AbortSignal.timeout(12000) });
   if (res.ok) {
     const data = await res.json();
@@ -2336,22 +2363,16 @@ async function fetchCryptoHistorical(ticker, date, invCurrency) {
     }
   }
 
-  // Second attempt: if date is before coin listing, fetch the very first available candle
-  // by querying from startTime with a large limit and taking the first result
   const url2 = `https://api.binance.com/api/v3/klines?symbol=${symbol}&interval=1d&startTime=${startTime}&limit=1`;
   res = await fetch(url2, { signal: AbortSignal.timeout(12000) });
   if (res.ok) {
     const data = await res.json();
     if (data?.length) {
       const closePrice = parseFloat(data[0][4]);
-      if (closePrice > 0) {
-        // Let the caller know this is the earliest available, not exact date
-        return toInvCurrency(closePrice, invCurrency);
-      }
+      if (closePrice > 0) return toInvCurrency(closePrice, invCurrency);
     }
   }
 
-  // Third attempt: query earliest ever listing (no startTime = from Binance epoch)
   const url3 = `https://api.binance.com/api/v3/klines?symbol=${symbol}&interval=1w&limit=1`;
   res = await fetch(url3, { signal: AbortSignal.timeout(12000) });
   if (res.ok) {
