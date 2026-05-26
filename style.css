@@ -1180,51 +1180,12 @@ td.td-mono { font-family: 'DM Mono', monospace; font-size: 13px; }
 }
 @media (max-width: 900px) {
   .inv-stats-grid { grid-template-columns: 1fr 1fr; }
-
-  /* Contain the table — no horizontal scroll ever */
-  .inv-table-desktop { display: block !important; overflow: hidden; width: 100%; }
+  /* Mobile: hide the desktop table, show card list */
+  .inv-table-desktop { display: none !important; }
   #page-investments .card { padding: 0; overflow: hidden; }
-
-  /* Force table to fit its container exactly */
-  #page-investments table {
-    table-layout: fixed;
-    width: 100% !important;
-  }
-
-  /* Hide non-essential columns: Type(2), Qty(3), Buy Price(4) */
-  #inv-table th:nth-child(2), #inv-table td:nth-child(2),
-  #inv-table th:nth-child(3), #inv-table td:nth-child(3),
-  #inv-table th:nth-child(4), #inv-table td:nth-child(4) { display: none; }
-
-  /* Assign fixed % widths to the 5 visible columns */
-  #inv-table th:nth-child(1), #inv-table td:nth-child(1) { width: 28%; } /* Asset */
-  #inv-table th:nth-child(5), #inv-table td:nth-child(5) { width: 26%; } /* Current Price */
-  #inv-table th:nth-child(6), #inv-table td:nth-child(6) { width: 22%; } /* Value */
-  #inv-table th:nth-child(7), #inv-table td:nth-child(7) { width: 14%; } /* P&L */
-  #inv-table th:nth-child(8), #inv-table td:nth-child(8) { width: 10%; } /* Actions */
-
-  /* Prevent any cell text from blowing out its column */
-  #inv-table td, #inv-table th {
-    padding: 8px 6px;
-    font-size: 11px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  /* Asset cell: allow name sub-text to wrap */
-  #inv-table td:first-child { white-space: normal; }
-  #inv-table td:first-child .td-primary { word-break: break-word; }
-
-  /* P&L: hide dollar amount, show only % */
-  #inv-table .pnl-amount { display: none; }
-
-  /* Actions: minimum padding */
-  #inv-table td:last-child { padding: 8px 2px; }
-  #inv-table td:last-child .btn-icon { padding: 4px; }
-  #inv-table td:last-child svg { width: 12px !important; height: 12px !important; }
 }
 @media (min-width: 901px) {
-  #inv-list-mobile { display: none; }
+  /* Desktop: hide mobile cards, show table */
+  #inv-list-mobile { display: none !important; }
   .pnl-amount { display: inline; }
 }
