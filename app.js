@@ -3392,7 +3392,7 @@ function buildAiTxnCard(txnData) {
     '<div style="display:flex;gap:8px">' +
       '<button onclick="confirmAiTransaction(\'' + payload.replace(/\\/g,'\\\\').replace(/"/g,'&quot;') + '\')" ' +
         'style="flex:2;padding:8px 14px;background:' + color + ';color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer">✅ Add Transaction</button>' +
-      '<button onclick="this.closest(\'[data-txn-card]\').remove()" ' +
+      '<button onclick="this.closest(\'[data-txn-card]\').outerHTML=\'<div style=&quot;margin-top:8px;padding:6px 12px;background:var(--bg-elevated);border:1px solid var(--border);border-radius:8px;font-size:12px;color:var(--text-muted);display:inline-block&quot;>✗ Cancelled</div>\'" ' +
         'style="flex:1;padding:8px 10px;background:var(--bg-elevated);color:var(--text-muted);border:1px solid var(--border);border-radius:8px;font-size:13px;cursor:pointer">✗ Cancel</button>' +
     '</div>' +
   '</div>';
@@ -3497,7 +3497,7 @@ window.sendAiMessage = async function() {
       '- walletName: wallet name the user mentioned; omit field if none mentioned\n' +
       '- ONE block only per response, at the very end\n' +
       '- Do NOT calculate or update balances yourself — the app handles that\n' +
-      '- Do NOT show the raw block text to the user — just write a short confirmation sentence before it\n\n' +
+      '- IMPORTANT: when recording a transaction, keep your reply SHORT — one sentence confirming the details, then the block. Do NOT give financial advice or commentary when the user just wants to log a transaction.\n\n' +
       buildFinancialContext();
 
     // Try multiple model names in case one is unavailable
