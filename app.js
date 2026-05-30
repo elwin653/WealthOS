@@ -57,7 +57,7 @@ let state = {
   navTabs: ['dashboard', 'wallet', 'transactions', 'investments'],
   accounts: [],
   recurringIncome: [],
-  aiDefaultWalletId: ''
+  defaultWalletId: ''
 };
 
 // ── Constants ───────────────────────────────────────────
@@ -2063,7 +2063,7 @@ function openModal(id) {
       var t = state.transactions.find(function(x){ return x.id === editId; });
       populateTxnWalletDropdown(t ? (t.walletId || '') : '');
     } else {
-      populateTxnWalletDropdown('');
+      populateTxnWalletDropdown(state.defaultWalletId || '');
     }
   }
   if (id === 'add-inv-modal' && !document.getElementById('inv-edit-id').value) {
@@ -2806,7 +2806,7 @@ window.addTxnForCalDay = function() {
   setTimeout(() => {
     const dateEl = document.getElementById('txn-date');
     if (dateEl) dateEl.value = dateStr;
-    populateTxnWalletDropdown('');
+    populateTxnWalletDropdown(state.defaultWalletId || '');
   }, 50);
 };
 
@@ -2927,7 +2927,7 @@ window.quickAddExpense = function() {
   setTimeout(function() {
     selectTxnType('expense');
     document.getElementById('txn-date').value = new Date().toISOString().slice(0,10);
-    populateTxnWalletDropdown('');
+    populateTxnWalletDropdown(state.defaultWalletId || '');
   }, 10);
 };
 
@@ -2936,7 +2936,7 @@ window.quickAddIncome = function() {
   setTimeout(function() {
     selectTxnType('income');
     document.getElementById('txn-date').value = new Date().toISOString().slice(0,10);
-    populateTxnWalletDropdown('');
+    populateTxnWalletDropdown(state.defaultWalletId || '');
   }, 10);
 };
 
@@ -2959,7 +2959,7 @@ function processSubscriptionCharges() {
       );
       if (!alreadyCharged) {
         // Add expense transaction
-        state.transactions.push({
+        var subTxn = {
           id: uid(),
           type: 'expense',
           desc: sub.name + ' (auto)',
@@ -2967,7 +2967,16 @@ function processSubscriptionCharges() {
           cat: sub.cat ? (sub.cat.charAt(0).toUpperCase() + sub.cat.slice(1)) : 'Bills',
           date: sub.renewal,
           subId: sub.id
-        });
+        };
+
+        // Deduct from default wallet if set (and not a liability-linked sub)
+        if (!sub.linkedLiabilityId && state.defaultWalletId) {
+          var defWa = (state.accounts || []).find(function(a) { return a.id === state.defaultWalletId; });
+          if (defWa) {
+            defWa.balance = (defWa.balance || 0) - sub.amount;
+            subTxn.walletId = state.defaultWalletId;
+          }
+        }
 
         // If linked to a liability account, reduce its balance
         if (sub.linkedLiabilityId) {
@@ -2977,6 +2986,7 @@ function processSubscriptionCharges() {
           }
         }
 
+        state.transactions.push(subTxn);
         charged.push(sub.name);
       }
 
@@ -3074,16 +3084,6 @@ window.renderSettingsPage = function() {
     }
   }
 
-  // AI default wallet dropdown
-  var aiWalletSel = document.getElementById('settings-ai-default-wallet');
-  if (aiWalletSel) {
-    var aiWalletOptions = '<option value="">— No default (always ask) —</option>';
-    (state.accounts || []).forEach(function(a) {
-      var sel = a.id === (state.aiDefaultWalletId || '') ? ' selected' : '';
-      aiWalletOptions += '<option value="' + a.id + '"' + sel + '>' + (a.icon || '') + ' ' + a.name + '</option>';
-    });
-    aiWalletSel.innerHTML = aiWalletOptions;
-  }
 };
 
 window.saveGeminiKey = function() {
@@ -3095,17 +3095,6 @@ window.saveGeminiKey = function() {
   save();
   window.renderSettingsPage();
   toast('✓ API key saved! Go to AI Advisor to start chatting.', 'success');
-};
-
-window.saveAiDefaultWallet = function(walletId) {
-  state.aiDefaultWalletId = walletId || '';
-  save();
-  var label = '';
-  if (walletId) {
-    var w = (state.accounts || []).find(function(a) { return a.id === walletId; });
-    label = w ? (w.icon || '') + ' ' + w.name : '';
-  }
-  toast(walletId ? ('⭐ Default wallet set to ' + label) : 'Default wallet cleared', 'success');
 };
 
 // (CURRENCIES, fxRates, fxLastFetched are declared at the top of the file)
@@ -3413,8 +3402,8 @@ function buildAiTxnCard(txnData) {
   }
 
   // 2. Fall back to user's default wallet if AI didn't mention one
-  if (!matchedWalletId && state.aiDefaultWalletId) {
-    var defWallet = accounts.find(function(a) { return a.id === state.aiDefaultWalletId; });
+  if (!matchedWalletId && state.defaultWalletId) {
+    var defWallet = accounts.find(function(a) { return a.id === state.defaultWalletId; });
     if (defWallet) matchedWalletId = defWallet.id;
   }
 
@@ -3446,7 +3435,7 @@ function buildAiTxnCard(txnData) {
     if (aiMentionedWallet) {
       walletSelectorHtml +=
         '<div style="font-size:11px;color:var(--text-muted);margin-top:4px;margin-bottom:2px">✨ Matched from your message — change if needed</div>';
-    } else if (state.aiDefaultWalletId && matchedWalletId) {
+    } else if (state.defaultWalletId && matchedWalletId) {
       walletSelectorHtml +=
         '<div style="font-size:11px;color:var(--text-muted);margin-top:4px;margin-bottom:2px">⭐ Using your default wallet — change if needed</div>';
     }
@@ -3784,14 +3773,25 @@ window.renderWallet = function() {
   var netWorth = totalCash + totalBank + totalAssets + totalInvest - totalLiab;
 
   function accountRow(a) {
+    var isDefault = state.defaultWalletId === a.id;
+    var starBtn = '<button onclick="window.setDefaultWallet(\'' + a.id + '\')" ' +
+      'title="' + (isDefault ? 'Remove as default' : 'Set as default wallet') + '" ' +
+      'style="background:none;border:none;cursor:pointer;font-size:16px;line-height:1;padding:2px 4px;opacity:' + (isDefault ? '1' : '0.3') + '">' +
+      (isDefault ? '⭐' : '☆') +
+    '</button>';
     return '<div style="display:flex;align-items:center;justify-content:space-between;padding:11px 0;border-bottom:1px solid var(--border)">' +
       '<div style="display:flex;align-items:center;gap:10px">' +
         '<div style="font-size:20px">' + (a.icon || '💳') + '</div>' +
-        '<div><div style="font-size:13.5px;font-weight:600">' + a.name + '</div>' +
-        (a.note ? '<div style="font-size:11px;color:var(--text-muted)">' + a.note + '</div>' : '') +
+        '<div>' +
+          '<div style="display:flex;align-items:center;gap:5px">' +
+            '<div style="font-size:13.5px;font-weight:600">' + a.name + '</div>' +
+            (isDefault ? '<span style="font-size:10px;font-weight:700;background:rgba(99,102,241,0.12);color:var(--accent);padding:2px 6px;border-radius:99px">DEFAULT</span>' : '') +
+          '</div>' +
+          (a.note ? '<div style="font-size:11px;color:var(--text-muted)">' + a.note + '</div>' : '') +
         '</div>' +
       '</div>' +
-      '<div style="display:flex;align-items:center;gap:10px">' +
+      '<div style="display:flex;align-items:center;gap:6px">' +
+        starBtn +
         '<div style="font-weight:700;font-size:14px;color:' + (a.type==='liability'?'var(--red)':'var(--text-primary)') + '">' +
           (a.type==='liability'?'-':'') + sym + (a.balance||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}) +
         '</div>' +
@@ -3853,6 +3853,20 @@ window.openAddAccount = function(type) {
   var noteLbl = document.getElementById('acct-note-label');
   if (noteLbl) noteLbl.textContent = type === 'bank' ? 'Bank name / account number (optional)' : 'Notes (optional)';
   openModal('add-account-modal');
+};
+
+window.setDefaultWallet = function(id) {
+  if (state.defaultWalletId === id) {
+    // Toggle off
+    state.defaultWalletId = '';
+    toast('Default wallet cleared', 'info');
+  } else {
+    state.defaultWalletId = id;
+    var w = (state.accounts || []).find(function(a) { return a.id === id; });
+    toast('\u2b50 ' + (w ? (w.icon || '') + ' ' + w.name : 'Wallet') + ' set as default', 'success');
+  }
+  save();
+  window.renderWallet();
 };
 
 window.editAccount = function(id) {
@@ -4129,12 +4143,18 @@ function processRecurringIncome() {
         createdAt: new Date().toISOString(),
         recurringId: ri.id
       };
-      // If linked to a wallet, deposit into it and tag the transaction
+      // If linked to a wallet, deposit into it; otherwise use default wallet
       if (ri.walletId) {
         var wa = (state.accounts || []).find(function(a){ return a.id === ri.walletId; });
         if (wa) {
           wa.balance = (wa.balance || 0) + ri.amount;
           newTxn.walletId = ri.walletId;
+        }
+      } else if (state.defaultWalletId) {
+        var defWa = (state.accounts || []).find(function(a){ return a.id === state.defaultWalletId; });
+        if (defWa) {
+          defWa.balance = (defWa.balance || 0) + ri.amount;
+          newTxn.walletId = state.defaultWalletId;
         }
       }
       state.transactions.push(newTxn);
