@@ -2342,10 +2342,52 @@ function parseStooqCsv(text, invCurrency, originalTicker) {
 async function fetchYahooPrice(ticker, invCurrency) {
   const symbol = COMMODITY_SYMBOLS[ticker.toUpperCase()] || ticker;
 
-  // Build all Yahoo URLs to try — v7/quote (no crumb) + v8/chart query1 + query2
   const v7url   = `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${encodeURIComponent(symbol)}`;
-  const v8q1url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=5d`;
   const v8q2url = `https://query2.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=5d`;
+  const v8q1url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=5d`;
+  const stooqUrl = `https://stooq.com/q/l/?s=${encodeURIComponent(toStooqSymbol(symbol))}&f=sd2t2ohlcv&h&e=csv`;
+  const workerUrl = `https://wealthai.elwin653.workers.dev/price?ticker=${encodeURIComponent(symbol)}`;
+
+  // Helper: fetch one URL via one proxy, resolve with price or reject
+  const attempt = (rawUrl, proxy, isStooq, isWorker) => {
+    return new Promise(async (resolve, reject) => {
+      try {
+        let url;
+        if (isWorker) url = rawUrl;
+        else if (proxy.endsWith('/fetch/')) url = proxy + rawUrl;
+        else url = proxy + encodeURIComponent(rawUrl);
+
+        const res = await fetch(url, { signal: AbortSignal.timeout(7000) });
+        if (!res.ok) return reject('not ok');
+        const text = await res.text();
+
+        if (isWorker) {
+          // Worker may return Yahoo JSON or simple {price}
+          const p1 = parseYahooLive(text, invCurrency);
+          if (p1 && p1 > 0) return resolve(p1);
+          const data = JSON.parse(text);
+          const p = parseFloat(data?.price || data?.regularMarketPrice);
+          if (p > 0) {
+            const cur = data?.currency || 'USD';
+            if (cur === 'MYR' && invCurrency !== 'MYR') return resolve(p * getLiveRate('MYR', invCurrency));
+            if (cur === 'USD' && invCurrency !== 'USD') return resolve(p * getLiveRate('USD', invCurrency));
+            return resolve(p);
+          }
+          return reject('no price');
+        }
+
+        if (isStooq) {
+          const p = parseStooqCsv(text, invCurrency, symbol);
+          if (p && p > 0) return resolve(p);
+          return reject('no stooq price');
+        }
+
+        const p = parseYahooLive(text, invCurrency);
+        if (p && p > 0) return resolve(p);
+        reject('no price');
+      } catch(e) { reject(e); }
+    });
+  };
 
   const proxies = [
     'https://api.allorigins.win/raw?url=',
@@ -2353,69 +2395,25 @@ async function fetchYahooPrice(ticker, invCurrency) {
     'https://thingproxy.freeboard.io/fetch/',
   ];
 
-  // Try v7/quote first (most likely to work — no crumb needed)
-  for (const proxy of proxies) {
-    try {
-      const url = proxy.endsWith('/fetch/') ? proxy + v7url : proxy + encodeURIComponent(v7url);
-      const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
-      if (!res.ok) continue;
-      const text = await res.text();
-      const price = parseYahooLive(text, invCurrency);
-      if (price && price > 0) return price;
-    } catch(e) {}
-  }
+  // Fire ALL sources simultaneously — first valid price wins
+  const races = [
+    // v7/quote across all proxies (best — no crumb needed)
+    ...proxies.map(p => attempt(v7url, p, false, false)),
+    // v8/chart query2 across all proxies
+    ...proxies.map(p => attempt(v8q2url, p, false, false)),
+    // v8/chart query1 across all proxies
+    ...proxies.map(p => attempt(v8q1url, p, false, false)),
+    // stooq CSV via first two proxies
+    ...proxies.slice(0, 2).map(p => attempt(stooqUrl, p, true, false)),
+    // Cloudflare Worker
+    attempt(workerUrl, null, false, true),
+  ];
 
-  // Then try v8/chart on query2 (sometimes bypasses auth)
-  for (const proxy of proxies) {
-    for (const yUrl of [v8q2url, v8q1url]) {
-      try {
-        const url = proxy.endsWith('/fetch/') ? proxy + yUrl : proxy + encodeURIComponent(yUrl);
-        const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
-        if (!res.ok) continue;
-        const text = await res.text();
-        const price = parseYahooLive(text, invCurrency);
-        if (price && price > 0) return price;
-      } catch(e) {}
-    }
-  }
-
-  // Try Cloudflare Worker (server-side, no CORS) — handles both stocks and crypto
   try {
-    const workerUrl = `https://wealthai.elwin653.workers.dev/price?ticker=${encodeURIComponent(symbol)}`;
-    const res = await fetch(workerUrl, { signal: AbortSignal.timeout(10000) });
-    if (res.ok) {
-      const text = await res.text();
-      // Worker may return Yahoo chart JSON or a simple {price:...} object
-      const price = parseYahooLive(text, invCurrency);
-      if (price && price > 0) return price;
-      const data = JSON.parse(text);
-      const p = parseFloat(data?.price || data?.regularMarketPrice);
-      if (p > 0) {
-        const cur = data?.currency || 'USD';
-        if (cur === 'MYR' && invCurrency !== 'MYR') return p * getLiveRate('MYR', invCurrency);
-        if (cur === 'USD' && invCurrency !== 'USD') return p * getLiveRate('USD', invCurrency);
-        return p;
-      }
-    }
-  } catch(e) {}
-
-  // Stooq.com CSV fallback
-  try {
-    const stooqSym = toStooqSymbol(symbol);
-    const stooqUrl = `https://stooq.com/q/l/?s=${encodeURIComponent(stooqSym)}&f=sd2t2ohlcv&h&e=csv`;
-    for (const proxy of proxies.slice(0, 2)) {
-      try {
-        const url = proxy.endsWith('/fetch/') ? proxy + stooqUrl : proxy + encodeURIComponent(stooqUrl);
-        const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
-        if (!res.ok) continue;
-        const text = await res.text();
-        const price = parseStooqCsv(text, invCurrency, symbol);
-        if (price && price > 0) return price;
-      } catch(e) {}
-    }
-  } catch(e) {}
-
-  throw new Error('Could not fetch price for ' + ticker + ' — try again or enter manually');
+    return await Promise.any(races);
+  } catch(e) {
+    throw new Error('Could not fetch price for ' + ticker + ' — all sources failed. Check your connection or enter price manually.');
+  }
 }
 
 // ── Yahoo historical price ──
