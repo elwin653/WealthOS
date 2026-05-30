@@ -3396,6 +3396,29 @@ function buildAiTxnCard(txnData) {
     walletId: matchedWalletId
   }).replace(/'/g, '&apos;');
 
+  var noWallets = !state.accounts || state.accounts.length === 0;
+
+  var cancelBtn = '<button onclick="this.closest(\'[data-txn-card]\').outerHTML=\'<div style=&quot;margin-top:8px;padding:6px 12px;background:var(--bg-elevated);border:1px solid var(--border);border-radius:8px;font-size:12px;color:var(--text-muted);display:inline-block&quot;>✗ Cancelled</div>\'" style="flex:1;padding:8px 10px;background:var(--bg-elevated);color:var(--text-muted);border:1px solid var(--border);border-radius:8px;font-size:13px;cursor:pointer">✗ Cancel</button>';
+
+  var actionButtons;
+  if (noWallets) {
+    actionButtons =
+      '<div style="margin-bottom:10px;padding:8px 10px;background:rgba(248,113,113,0.12);border:1px solid var(--red);border-radius:8px;font-size:12px;color:var(--red);font-weight:500">' +
+        '⚠️ You need a wallet to record this transaction. Please add one first.' +
+      '</div>' +
+      '<div style="display:flex;gap:8px">' +
+        '<button onclick="navigate(\'wallet\')" style="flex:2;padding:8px 14px;background:var(--accent);color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer">➕ Add a Wallet First</button>' +
+        cancelBtn +
+      '</div>';
+  } else {
+    actionButtons =
+      '<div style="display:flex;gap:8px">' +
+        '<button onclick="confirmAiTransaction(\'' + payload.replace(/\\/g,'\\\\').replace(/"/g,'&quot;') + '\')" ' +
+          'style="flex:2;padding:8px 14px;background:' + color + ';color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer">✅ Add Transaction</button>' +
+        cancelBtn +
+      '</div>';
+  }
+
   return '<div data-txn-card="1" style="margin-top:12px;background:' + bg + ';border:1.5px solid ' + color + ';border-radius:12px;padding:14px">' +
     '<div style="font-size:11px;font-weight:700;color:' + color + ';text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px">📋 Transaction to Add</div>' +
     '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:10px">' +
@@ -3407,21 +3430,24 @@ function buildAiTxnCard(txnData) {
       '<div style="font-size:13px;font-weight:700;color:' + color + '">' + sign + sym + parseFloat(txnData.amount || 0).toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2}) + '</div>' +
       '<div style="font-size:12px;color:var(--text-muted)">Category</div>' +
       '<div style="font-size:12px;font-weight:600">' + (txnData.cat || 'Other') + '</div>' +
-      '<div style="font-size:12px;color:var(--text-muted)">Wallet</div>' +
-      '<div style="font-size:12px;font-weight:600">' + walletLabel + '</div>' +
+      (noWallets ? '' :
+        '<div style="font-size:12px;color:var(--text-muted)">Wallet</div>' +
+        '<div style="font-size:12px;font-weight:600">' + walletLabel + '</div>'
+      ) +
     '</div>' +
-    '<div style="display:flex;gap:8px">' +
-      '<button onclick="confirmAiTransaction(\'' + payload.replace(/\\/g,'\\\\').replace(/"/g,'&quot;') + '\')" ' +
-        'style="flex:2;padding:8px 14px;background:' + color + ';color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer">✅ Add Transaction</button>' +
-      '<button onclick="this.closest(\'[data-txn-card]\').outerHTML=\'<div style=&quot;margin-top:8px;padding:6px 12px;background:var(--bg-elevated);border:1px solid var(--border);border-radius:8px;font-size:12px;color:var(--text-muted);display:inline-block&quot;>✗ Cancelled</div>\'" ' +
-        'style="flex:1;padding:8px 10px;background:var(--bg-elevated);color:var(--text-muted);border:1px solid var(--border);border-radius:8px;font-size:13px;cursor:pointer">✗ Cancel</button>' +
-    '</div>' +
+    actionButtons +
   '</div>';
 }
 
 window.confirmAiTransaction = function(payloadStr) {
   try {
     var txnData = JSON.parse(payloadStr.replace(/&apos;/g,"'").replace(/&quot;/g,'"'));
+    // Guard: wallet must exist before recording AI transaction
+    if (!state.accounts || state.accounts.length === 0) {
+      toast('⚠️ Please add a wallet first before recording transactions.', 'error');
+      navigate('wallet');
+      return;
+    }
     var today = new Date().toISOString().slice(0,10);
     var newTxn = {
       id: uid(),
