@@ -3472,7 +3472,7 @@ function buildAiTxnCard(txnData) {
       '</div>';
   }
 
-  return '<div data-txn-card="1" id="' + cardId + '" style="margin-top:12px;background:' + bg + ';border:1.5px solid ' + color + ';border-radius:12px;padding:14px">' +
+  var html = '<div data-txn-card="1" id="' + cardId + '" style="margin-top:12px;background:' + bg + ';border:1.5px solid ' + color + ';border-radius:12px;padding:14px">' +
     '<div style="font-size:11px;font-weight:700;color:' + color + ';text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px">📋 Transaction to Add</div>' +
     '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:6px">' +
       '<div style="font-size:12px;color:var(--text-muted)">Type</div>' +
@@ -3487,6 +3487,7 @@ function buildAiTxnCard(txnData) {
     walletSelectorHtml +
     actionButtons +
   '</div>';
+  return { html: html, cardId: cardId, walletId: matchedWalletId };
 }
 
 // Called by new card-based AI transaction confirm (reads wallet dropdown at click time)
@@ -3631,7 +3632,8 @@ window.sendAiMessage = async function() {
       'You have the user real financial data below. Give specific, actionable advice based on their actual numbers. ' +
       'Be concise but thorough. Use bullet points where helpful. ' +
       'Always reference their specific amounts. Be encouraging but honest.\n\n' +
-      'TRANSACTION RECORDING: When the user asks you to add/record/log a transaction, you MUST output a machine-readable block at the very END of your message. ' +
+      'TRANSACTION RECORDING: Output a [TXN:{...}] block ONLY when the user EXPLICITLY asks to add, record, or log a specific transaction (e.g. "add 500 income", "log my lunch expense"). ' +
+      'NEVER output a [TXN:{...}] block for summaries, analysis, questions, or any request that is not explicitly asking to record a transaction. ' +
       'Use EXACTLY this format with the square brackets — do not change the format:\n' +
       '[TXN:{"type":"income","desc":"From parents","amount":500,"cat":"Other","walletName":"Maybank 123"}]\n' +
       'STRICT RULES — follow exactly:\n' +
@@ -3713,16 +3715,22 @@ window.sendAiMessage = async function() {
     var typingEl = document.getElementById(typingId);
     // Safety: only update if this element is an assistant bubble (never a user bubble)
     if (typingEl && typingEl.classList.contains('ai-msg-assistant')) {
-      // Check for [TXN:{...}] block — also catch if AI omits the square brackets
-      var txnMatch = reply.match(/\[TXN:(\{[\s\S]*?\})\]/) || reply.match(/\bTXN:(\{[\s\S]*?\})/);
+      // Check for [TXN:{...}] block — ONLY match with square brackets (strict, no false positives)
+      var txnMatch = reply.match(/\[TXN:(\{[\s\S]*?\})\]/);
       var displayReply = reply;
       if (txnMatch) {
-        // Strip the raw TXN block from visible text (both formats)
-        displayReply = reply.replace(/\[TXN:\{[\s\S]*?\}\]/, '').replace(/\bTXN:\{[\s\S]*?\}/, '').trim();
+        // Strip the raw TXN block from visible text
+        displayReply = reply.replace(/\[TXN:\{[\s\S]*?\}\]/g, '').trim();
         try {
           var txnData = JSON.parse(txnMatch[1]);
-          var confirmHtml = buildAiTxnCard(txnData);
-          typingEl.querySelector('.ai-msg-bubble').innerHTML = escapeHtml(displayReply) + confirmHtml;
+          var cardResult = buildAiTxnCard(txnData);
+          typingEl.querySelector('.ai-msg-bubble').innerHTML = escapeHtml(displayReply) + cardResult.html;
+          // Force wallet select to the pre-chosen wallet AFTER DOM insertion
+          // (innerHTML injection doesn't reliably honour `selected` attribute in all browsers)
+          if (cardResult.walletId && cardResult.cardId) {
+            var selEl = document.getElementById(cardResult.cardId + '-wallet');
+            if (selEl) selEl.value = cardResult.walletId;
+          }
         } catch(parseErr) {
           typingEl.querySelector('.ai-msg-bubble').innerHTML = escapeHtml(displayReply);
         }
@@ -3735,7 +3743,7 @@ window.sendAiMessage = async function() {
     }
 
     // Store in history WITHOUT the TXN block so it doesn't trigger again next message
-    var historyReply = reply.replace(/\[TXN:\{[\s\S]*?\}\]/g, '').replace(/\bTXN:\{[\s\S]*?\}/g, '').trim();
+    var historyReply = reply.replace(/\[TXN:\{[\s\S]*?\}\]/g, '').trim();
     aiHistory.push({ role: 'model', parts: [{ text: historyReply }] });
     if (aiHistory.length > 20) aiHistory = aiHistory.slice(-20);
 
