@@ -2285,29 +2285,158 @@ function yahooProxyUrls(yahooUrl) {
   return urls;
 }
 
+// Convert ticker to stooq.com symbol format
+// US stocks: AAPL → aapl.us | MY stocks: 1155.KL → 1155.my | ETFs: VOO → voo.us
+function toStooqSymbol(ticker) {
+  const t = ticker.toUpperCase();
+  if (t.endsWith('.KL')) return t.replace('.KL', '.MY').toLowerCase();
+  // Commodities map
+  const commMap = { 'GC=F': 'xau.usd', 'SI=F': 'xag.usd', 'CL=F': 'cl.f', 'NG=F': 'ng.f' };
+  if (commMap[t]) return commMap[t];
+  // Default: assume US stock/ETF
+  return t.toLowerCase() + '.us';
+}
+
+// Parse stooq.com CSV response: Symbol,Date,Time,Open,High,Low,Close,Volume
+function parseStooqCsv(text, invCurrency, originalTicker) {
+  if (!text || text.includes('No data')) return null;
+  const lines = text.trim().split('\n');
+  if (lines.length < 2) return null;
+  const dataLine = lines[1].trim();
+  if (!dataLine) return null;
+  const cols = dataLine.split(',');
+  const close = parseFloat(cols[6]); // Close price is column 7 (index 6)
+  if (!close || close <= 0 || isNaN(close)) return null;
+  // MY stocks on stooq are in MYR, US stocks in USD
+  const isMY = originalTicker.toUpperCase().endsWith('.KL');
+  if (isMY && invCurrency !== 'MYR') return close * getLiveRate('MYR', invCurrency);
+  if (!isMY && invCurrency !== 'USD') return close * getLiveRate('USD', invCurrency);
+  return close;
+}
+
 async function fetchYahooPrice(ticker, invCurrency) {
   const symbol = COMMODITY_SYMBOLS[ticker.toUpperCase()] || ticker;
-  const yahooUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=1d`;
 
-  for (const proxyUrl of yahooProxyUrls(yahooUrl)) {
+  // ── Source 1: Cloudflare Worker (server-side Yahoo fetch, no CORS) ──
+  try {
+    const workerUrl = `https://wealthai.elwin653.workers.dev/price?ticker=${encodeURIComponent(symbol)}`;
+    const res = await fetch(workerUrl, { signal: AbortSignal.timeout(10000) });
+    if (res.ok) {
+      const data = await res.json();
+      const p = parseFloat(data?.price || data?.regularMarketPrice);
+      if (p > 0) {
+        const cur = data?.currency || 'USD';
+        if (cur === 'USD' && invCurrency !== 'USD') return p * getLiveRate('USD', invCurrency);
+        if (cur === 'MYR' && invCurrency !== 'MYR') return p * getLiveRate('MYR', invCurrency);
+        return p;
+      }
+    }
+  } catch(e) {}
+
+  // ── Source 2: Stooq.com CSV (free, reliable, no auth needed) ──
+  try {
+    const stooqSym = toStooqSymbol(symbol);
+    const stooqUrl = `https://stooq.com/q/l/?s=${encodeURIComponent(stooqSym)}&f=sd2t2ohlcv&h&e=csv`;
+    const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(stooqUrl)}`;
+    const res = await fetch(proxyUrl, { signal: AbortSignal.timeout(10000) });
+    if (res.ok) {
+      const text = await res.text();
+      const price = parseStooqCsv(text, invCurrency, symbol);
+      if (price && price > 0) return price;
+    }
+  } catch(e) {}
+
+  // ── Source 3: Stooq via corsproxy ──
+  try {
+    const stooqSym = toStooqSymbol(symbol);
+    const stooqUrl = `https://stooq.com/q/l/?s=${encodeURIComponent(stooqSym)}&f=sd2t2ohlcv&h&e=csv`;
+    const proxyUrl = `https://corsproxy.io/?url=${encodeURIComponent(stooqUrl)}`;
+    const res = await fetch(proxyUrl, { signal: AbortSignal.timeout(10000) });
+    if (res.ok) {
+      const text = await res.text();
+      const price = parseStooqCsv(text, invCurrency, symbol);
+      if (price && price > 0) return price;
+    }
+  } catch(e) {}
+
+  // ── Source 4: Yahoo Finance v8 via remaining proxies ──
+  const yahooUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=5d`;
+  for (const proxyUrl of [
+    `https://api.allorigins.win/raw?url=${encodeURIComponent(yahooUrl)}`,
+    `https://corsproxy.io/?url=${encodeURIComponent(yahooUrl)}`,
+    `https://api.allorigins.win/raw?url=${encodeURIComponent(yahooUrl.replace('query1', 'query2'))}`,
+  ]) {
     try {
       const res = await fetch(proxyUrl, { signal: AbortSignal.timeout(10000) });
       if (!res.ok) continue;
       const text = await res.text();
       const price = parseYahooLive(text, invCurrency);
       if (price) return price;
-    } catch(e) { /* try next */ }
+    } catch(e) {}
   }
+
   throw new Error('Could not fetch price for ' + ticker + ' — try again or enter manually');
 }
 
 // ── Yahoo historical price ──
 async function fetchYahooHistorical(ticker, date, invCurrency) {
   const symbol = COMMODITY_SYMBOLS[ticker.toUpperCase()] || ticker;
+
+  // ── Source 1: Cloudflare Worker historical ──
+  try {
+    const from = Math.floor((date.getTime() - 4 * 86400000) / 1000);
+    const to   = Math.floor((date.getTime() + 5 * 86400000) / 1000);
+    const workerUrl = `https://wealthai.elwin653.workers.dev/price?ticker=${encodeURIComponent(symbol)}&period1=${from}&period2=${to}`;
+    const res = await fetch(workerUrl, { signal: AbortSignal.timeout(12000) });
+    if (res.ok) {
+      const text = await res.text();
+      const data = JSON.parse(text);
+      const result = data?.chart?.result?.[0];
+      const closes = result?.indicators?.quote?.[0]?.close;
+      const currency = result?.meta?.currency || 'USD';
+      if (closes?.length) {
+        const validClose = [...closes].reverse().find(p => p != null && p > 0);
+        if (validClose) {
+          if (currency === 'USD' && invCurrency !== 'USD') return validClose * getLiveRate('USD', invCurrency);
+          if (currency === 'MYR' && invCurrency !== 'MYR') return validClose * getLiveRate('MYR', invCurrency);
+          return validClose;
+        }
+      }
+    }
+  } catch(e) {}
+
+  // ── Source 2: Stooq historical CSV ──
+  try {
+    const stooqSym = toStooqSymbol(symbol);
+    const d = date;
+    const fmt = (dt) => `${dt.getFullYear()}${String(dt.getMonth()+1).padStart(2,'0')}${String(dt.getDate()).padStart(2,'0')}`;
+    const fromD = new Date(d.getTime() - 7 * 86400000);
+    const stooqUrl = `https://stooq.com/q/d/l/?s=${encodeURIComponent(stooqSym)}&d1=${fmt(fromD)}&d2=${fmt(d)}&i=d`;
+    const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(stooqUrl)}`;
+    const res = await fetch(proxyUrl, { signal: AbortSignal.timeout(10000) });
+    if (res.ok) {
+      const text = await res.text();
+      if (text && !text.includes('No data') && text.includes(',')) {
+        const lines = text.trim().split('\n').filter(l => l && !l.startsWith('Date'));
+        const lastLine = lines[lines.length - 1];
+        if (lastLine) {
+          const cols = lastLine.split(',');
+          const close = parseFloat(cols[4]);
+          if (close > 0) {
+            const isMY = symbol.toUpperCase().endsWith('.KL');
+            if (isMY && invCurrency !== 'MYR') return close * getLiveRate('MYR', invCurrency);
+            if (!isMY && invCurrency !== 'USD') return close * getLiveRate('USD', invCurrency);
+            return close;
+          }
+        }
+      }
+    }
+  } catch(e) {}
+
+  // ── Source 3: Yahoo Finance v8 via proxies ──
   const from = Math.floor((date.getTime() - 4 * 86400000) / 1000);
   const to   = Math.floor((date.getTime() + 5 * 86400000) / 1000);
   const yahooUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&period1=${from}&period2=${to}`;
-
   for (const proxyUrl of yahooProxyUrls(yahooUrl)) {
     try {
       const res = await fetch(proxyUrl, { signal: AbortSignal.timeout(12000) });
@@ -3629,17 +3758,46 @@ window.confirmAiGoal = function(goalId, amount, cardId) {
   var g = (state.goals || []).find(function(x) { return x.id === goalId; });
   if (!g) { toast('Goal not found', 'error'); return; }
   var added = parseFloat(amount) || 0;
+
+  // 1. Update goal progress
   g.current = Math.min(g.target, (g.current || 0) + added);
+
+  // 2. Create an expense transaction so it shows in transactions + wallet
+  var today = new Date().toISOString().slice(0, 10);
+  var newTxn = {
+    id: uid(),
+    type: 'expense',
+    desc: 'Savings: ' + g.name,
+    amount: added,
+    cat: 'Investment',
+    date: today,
+    createdAt: Date.now(),
+    goalId: goalId
+  };
+
+  // 3. Deduct from default wallet if set
+  var walletNote = '';
+  if (state.defaultWalletId) {
+    var wa = (state.accounts || []).find(function(a) { return a.id === state.defaultWalletId; });
+    if (wa) {
+      wa.balance = (wa.balance || 0) - added;
+      newTxn.walletId = state.defaultWalletId;
+      walletNote = ' → ' + (wa.icon || '') + ' ' + wa.name;
+    }
+  }
+
+  state.transactions.push(newTxn);
   save();
   renderAll();
+
   var sym = curr();
   var card = document.getElementById(cardId);
   if (card) {
     card.outerHTML = '<div style="margin-top:10px;padding:10px 14px;background:rgba(99,102,241,0.12);border:1px solid var(--accent);border-radius:10px;font-size:13px;color:var(--accent);font-weight:600">' +
-      '✅ Added ' + sym + added.toLocaleString('en-US', {minimumFractionDigits:2}) + ' to ' + (g.icon || '🎯') + ' ' + g.name +
+      '✅ Added ' + sym + added.toLocaleString('en-US', {minimumFractionDigits:2}) + ' to ' + (g.icon || '🎯') + ' ' + g.name + walletNote +
     '</div>';
   }
-  toast('Goal updated ✓', 'success');
+  toast('Goal updated + transaction recorded ✓', 'success');
 };
 
 window.confirmAiTransaction = function(payloadStr) {
