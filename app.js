@@ -147,6 +147,12 @@ function load() {
       if (!Array.isArray(state.accounts)) state.accounts = [];
       if (!Array.isArray(state.recurringIncome)) state.recurringIncome = [];
       if (!Array.isArray(state.networthHistory)) state.networthHistory = [];
+      // Migrate old aiDefaultWalletId → defaultWalletId
+      if (!state.defaultWalletId && state.aiDefaultWalletId) {
+        state.defaultWalletId = state.aiDefaultWalletId;
+        delete state.aiDefaultWalletId;
+      }
+      if (!state.defaultWalletId) state.defaultWalletId = '';
       // If onboardingDone somehow missing but they have real data, restore it
       if (!state.onboardingDone && (state.transactions.length || state.investments.length)) {
         state.onboardingDone = true;
@@ -3728,7 +3734,9 @@ window.sendAiMessage = async function() {
       appendAiMessage('assistant', reply, false);
     }
 
-    aiHistory.push({ role: 'model', parts: [{ text: reply }] });
+    // Store in history WITHOUT the TXN block so it doesn't trigger again next message
+    var historyReply = reply.replace(/\[TXN:\{[\s\S]*?\}\]/g, '').replace(/\bTXN:\{[\s\S]*?\}/g, '').trim();
+    aiHistory.push({ role: 'model', parts: [{ text: historyReply }] });
     if (aiHistory.length > 20) aiHistory = aiHistory.slice(-20);
 
   } catch(e) {
