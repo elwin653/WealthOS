@@ -37,8 +37,8 @@ var LANG = {
 // ── State ──────────────────────────────────────────────
 let state = {
   currency: 'MYR',
-  darkMode: true,
-  themeMode: 'dark',
+  darkMode: false,
+  themeMode: 'light',
   hideNumbers: false,
   transactions: [],
   investments: [],
@@ -573,34 +573,38 @@ function renderInsights() {
     return dd !== 0 ? dd : (b.createdAt||0) - (a.createdAt||0);
   }).slice(0, 3);
 
-  var recentHtml = '';
-  if (recent.length) {
-    recentHtml = '<div style="background:var(--bg-elevated);border-radius:12px;border:1px solid var(--border);overflow:hidden">' +
-      '<div style="padding:10px 14px 6px;font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.07em">Recent Activity</div>' +
-      recent.map(function(t) {
-        var isInc = t.type === 'income';
-        var col = isInc ? 'var(--green)' : 'var(--red)';
-        var sign = isInc ? '+' : '−';
-        var icon = CAT_ICONS[t.cat] || (isInc ? '💰' : '💸');
-        var d = new Date(t.date + 'T00:00:00');
-        var dateStr = d.toLocaleDateString('en-MY', {day:'numeric', month:'short'});
-        return '<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 14px;border-top:1px solid var(--border)">' +
-          '<div style="display:flex;align-items:center;gap:10px;min-width:0">' +
-            '<span style="font-size:16px">' + icon + '</span>' +
-            '<div style="min-width:0">' +
-              '<div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + t.desc + '</div>' +
-              '<div style="font-size:10px;color:var(--text-muted)">' + t.cat + ' · ' + dateStr + '</div>' +
-            '</div>' +
-          '</div>' +
-          '<div style="font-size:13px;font-weight:700;color:' + col + ';flex-shrink:0;margin-left:10px">' + sign + fmtH(t.amount) + '</div>' +
-        '</div>';
-      }).join('') +
+  // ── Top goal progress (replaces duplicate recent list) ──
+  var goalHtml = '';
+  var goals = (state.goals || []).filter(function(g){ return g.target > 0; })
+    .sort(function(a,b){ return (b.current/b.target) - (a.current/a.target); });
+  if (goals.length) {
+    var g = goals[0];
+    var gPct = Math.min(100, Math.round((g.current / g.target) * 100));
+    var gColor = gPct >= 80 ? 'var(--green)' : gPct >= 40 ? 'var(--accent)' : 'var(--amber)';
+    goalHtml = '<div style="background:var(--bg-elevated);border-radius:12px;border:1px solid var(--border);padding:12px">' +
+      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">' +
+        '<div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.07em">🎯 Top Goal</div>' +
+        '<div style="font-size:10px;color:' + gColor + ';font-weight:700">' + gPct + '%</div>' +
+      '</div>' +
+      '<div style="font-size:13px;font-weight:600;margin-bottom:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + (g.icon||'🎯') + ' ' + g.name + '</div>' +
+      '<div style="height:6px;background:var(--border);border-radius:99px;overflow:hidden;margin-bottom:6px">' +
+        '<div style="height:100%;width:' + gPct + '%;background:' + gColor + ';border-radius:99px;transition:width 0.6s ease"></div>' +
+      '</div>' +
+      '<div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text-muted)">' +
+        '<span>' + fmtH(g.current) + ' saved</span>' +
+        '<span>Target: ' + fmtH(g.target) + '</span>' +
+      '</div>' +
+    '</div>';
+  } else if (savRate < 10 && monthExp > 0) {
+    goalHtml = '<div style="background:rgba(248,113,113,0.08);border:1px solid rgba(248,113,113,0.25);border-radius:12px;padding:12px;font-size:12px;color:var(--text-primary)">' +
+      '<div style="font-weight:700;margin-bottom:4px">💡 Savings Tip</div>' +
+      'Your savings rate is ' + savRate.toFixed(0) + '% this month. Try setting a goal to stay on track.' +
     '</div>';
   } else {
-    recentHtml = '<div style="padding:20px;text-align:center;color:var(--text-muted);font-size:13px;background:var(--bg-elevated);border-radius:12px;border:1px solid var(--border)">No transactions yet — add your first one!</div>';
+    goalHtml = '<div style="background:var(--bg-elevated);border-radius:12px;border:1px solid var(--border);padding:16px;text-align:center;color:var(--text-muted);font-size:12px">Add goals in the Goals page to track progress here.</div>';
   }
 
-  el.innerHTML = budgetHtml + chipsHtml;
+  el.innerHTML = budgetHtml + chipsHtml + goalHtml;
 }
 
 function generateInsights() { return []; } // kept for compatibility
@@ -1979,7 +1983,7 @@ function confirmReset() {
 
     // Fully reset state to defaults
     state = {
-      currency: 'MYR', darkMode: true, themeMode: 'dark', hideNumbers: false,
+      currency: 'MYR', darkMode: false, themeMode: 'light', hideNumbers: false,
       transactions: [], investments: [], goals: [], subscriptions: [], networthHistory: [],
       selectedTxnType: 'income', selectedGoalIcon: '🎯', editingGoalId: null, charts: {},
       onboardingDone: false, userName: '', monthlyIncome: 0, budgetLimit: 0,
@@ -3415,7 +3419,7 @@ function buildAiTxnCard(txnData) {
 
   // 3. Build card-level wallet selector (always shown when wallets exist)
   //    Uses a unique card id so the select's onchange can update the hidden payload field
-  var cardId = 'ai-txn-card-' + (++_aiMsgCounter);
+  var cardId = 'ai-txn-card-' + (++_aiCardCounter);
 
   var basePayload = {
     type: txnData.type,
@@ -3580,6 +3584,7 @@ window.confirmAiTransaction = function(payloadStr) {
 };
 
 var _aiMsgCounter = 0;
+var _aiCardCounter = 0;
 function appendAiMessage(role, text, isStreaming) {
   var container = document.getElementById('ai-messages');
   if (!container) return;
@@ -3727,9 +3732,14 @@ window.sendAiMessage = async function() {
           typingEl.querySelector('.ai-msg-bubble').innerHTML = escapeHtml(displayReply) + cardResult.html;
           // Force wallet select to the pre-chosen wallet AFTER DOM insertion
           // (innerHTML injection doesn't reliably honour `selected` attribute in all browsers)
-          if (cardResult.walletId && cardResult.cardId) {
-            var selEl = document.getElementById(cardResult.cardId + '-wallet');
-            if (selEl) selEl.value = cardResult.walletId;
+          if (cardResult.cardId) {
+            // Use setTimeout(0) to guarantee DOM is fully painted before forcing select value
+            (function(cId, wId) {
+              setTimeout(function() {
+                var selEl = document.getElementById(cId + '-wallet');
+                if (selEl && wId) selEl.value = wId;
+              }, 0);
+            })(cardResult.cardId, cardResult.walletId);
           }
         } catch(parseErr) {
           typingEl.querySelector('.ai-msg-bubble').innerHTML = escapeHtml(displayReply);
