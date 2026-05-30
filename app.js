@@ -1569,9 +1569,16 @@ async function invFetchPrice() {
   const invCurr = autoCurr;
   const purchaseDate = dateEl.value;
 
-  // Auto-detect type from ticker
-  if (CRYPTO_IDS[ticker]) typeEl.value = 'crypto';
-  else if (COMMODITY_SYMBOLS[ticker]) typeEl.value = 'commodity';
+  // Auto-detect type from ticker — always reset, never inherit stale state from previous fetch
+  if (CRYPTO_IDS[ticker]) {
+    typeEl.value = 'crypto';
+  } else if (COMMODITY_SYMBOLS[ticker]) {
+    typeEl.value = 'commodity';
+  } else if (ticker.endsWith('.KL')) {
+    typeEl.value = 'stock'; // Bursa Malaysia
+  } else {
+    typeEl.value = 'stock'; // Default: US stock or ETF
+  }
   const type = typeEl.value;
 
   // Lock the type — auto-detected, user shouldn't change it
@@ -1659,6 +1666,9 @@ window.invClearFetch = function() {
     btn.disabled = false;
     btn.innerHTML = REFRESH_SVG + ' Fetch Price';
   }
+  // Reset type dropdown so it doesn't carry over from previous ticker
+  var typeEl = document.getElementById('inv-type');
+  if (typeEl) { typeEl.value = 'stock'; typeEl.disabled = false; typeEl.title = ''; }
   var resultEl = document.getElementById('inv-fetch-result');
   if (resultEl) { resultEl.style.display = 'none'; resultEl.innerHTML = ''; }
   var statusEl = document.getElementById('inv-save-status');
