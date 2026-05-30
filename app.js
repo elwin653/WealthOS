@@ -1618,10 +1618,8 @@ async function invFetchPrice() {
 
   } catch(e) {
     console.error('Fetch error:', e);
-    // Re-enable type selector so user can pick manually when ticker is wrong
     typeEl.disabled = false;
     typeEl.title = '';
-    // Show a helpful error card — user can still enter prices manually
     resultEl.style.display = 'block';
     resultEl.style.borderColor = 'var(--red)';
     resultEl.innerHTML =
@@ -1629,13 +1627,14 @@ async function invFetchPrice() {
         '<span style="font-size:20px">⚠️</span>' +
         '<div>' +
           '<div style="font-weight:600;color:var(--red);margin-bottom:4px">Could not fetch "' + ticker + '"</div>' +
-          '<div style="font-size:12px;color:var(--text-muted);margin-bottom:8px">This could be a wrong ticker symbol or a network issue. Common examples: ' +
+          '<div style="font-size:12px;color:var(--text-muted);margin-bottom:6px">' + (e.message || 'Network error — all price sources failed') + '</div>' +
+          '<div style="font-size:12px;color:var(--text-muted);margin-bottom:8px">Check your internet connection or try again in a moment. Common formats: ' +
             '<code style="background:var(--bg-elevated);padding:1px 5px;border-radius:4px">AAPL</code> ' +
-            '<code style="background:var(--bg-elevated);padding:1px 5px;border-radius:4px">MSFT</code> ' +
             '<code style="background:var(--bg-elevated);padding:1px 5px;border-radius:4px">VOO</code> ' +
+            '<code style="background:var(--bg-elevated);padding:1px 5px;border-radius:4px">1155.KL</code> ' +
             '<code style="background:var(--bg-elevated);padding:1px 5px;border-radius:4px">BTC</code>' +
           '</div>' +
-          '<div style="font-size:12px;color:var(--text-primary)">💡 You can still save by entering the <strong>Buy Price</strong> manually below, then clicking <strong>Save Investment</strong>.</div>' +
+          '<div style="font-size:12px;color:var(--text-primary)">💡 You can still save by entering the <strong>Buy Price</strong> manually below.</div>' +
         '</div>' +
       '</div>';
     statusEl.textContent = '⚠️ Fetch failed — enter buy price manually below to save anyway';
@@ -2237,17 +2236,33 @@ function toInvCurrency(usdPrice, invCurrency) {
 // Helper: parse Yahoo JSON and extract regularMarketPrice
 function parseYahooLive(text, invCurrency) {
   if (!text) return null;
-  // Reject obvious non-JSON responses (HTML error pages from proxies)
   const trimmed = text.trimStart();
   if (!trimmed.startsWith('{')) return null;
   try {
     const data = JSON.parse(text);
+
+    // ── v8/chart format ──
     const result = data?.chart?.result?.[0];
-    const price = result?.meta?.regularMarketPrice;
-    const currency = result?.meta?.currency || 'USD';
-    if (price && price > 0) {
-      if (currency === 'USD' && invCurrency !== 'USD') return price * getLiveRate('USD', invCurrency);
-      return price;
+    if (result) {
+      const price = result?.meta?.regularMarketPrice;
+      const currency = result?.meta?.currency || 'USD';
+      if (price && price > 0) {
+        if (currency === 'MYR' && invCurrency !== 'MYR') return price * getLiveRate('MYR', invCurrency);
+        if (currency === 'USD' && invCurrency !== 'USD') return price * getLiveRate('USD', invCurrency);
+        return price;
+      }
+    }
+
+    // ── v7/quote format ──
+    const quote = data?.quoteResponse?.result?.[0];
+    if (quote) {
+      const price = quote?.regularMarketPrice;
+      const currency = quote?.currency || 'USD';
+      if (price && price > 0) {
+        if (currency === 'MYR' && invCurrency !== 'MYR') return price * getLiveRate('MYR', invCurrency);
+        if (currency === 'USD' && invCurrency !== 'USD') return price * getLiveRate('USD', invCurrency);
+        return price;
+      }
     }
   } catch(e) {}
   return null;
@@ -2317,63 +2332,78 @@ function parseStooqCsv(text, invCurrency, originalTicker) {
 async function fetchYahooPrice(ticker, invCurrency) {
   const symbol = COMMODITY_SYMBOLS[ticker.toUpperCase()] || ticker;
 
-  // ── Source 1: Cloudflare Worker (server-side Yahoo fetch, no CORS) ──
+  // Build all Yahoo URLs to try — v7/quote (no crumb) + v8/chart query1 + query2
+  const v7url   = `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${encodeURIComponent(symbol)}`;
+  const v8q1url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=5d`;
+  const v8q2url = `https://query2.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=5d`;
+
+  const proxies = [
+    'https://api.allorigins.win/raw?url=',
+    'https://corsproxy.io/?url=',
+    'https://thingproxy.freeboard.io/fetch/',
+  ];
+
+  // Try v7/quote first (most likely to work — no crumb needed)
+  for (const proxy of proxies) {
+    try {
+      const url = proxy.endsWith('/fetch/') ? proxy + v7url : proxy + encodeURIComponent(v7url);
+      const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
+      if (!res.ok) continue;
+      const text = await res.text();
+      const price = parseYahooLive(text, invCurrency);
+      if (price && price > 0) return price;
+    } catch(e) {}
+  }
+
+  // Then try v8/chart on query2 (sometimes bypasses auth)
+  for (const proxy of proxies) {
+    for (const yUrl of [v8q2url, v8q1url]) {
+      try {
+        const url = proxy.endsWith('/fetch/') ? proxy + yUrl : proxy + encodeURIComponent(yUrl);
+        const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
+        if (!res.ok) continue;
+        const text = await res.text();
+        const price = parseYahooLive(text, invCurrency);
+        if (price && price > 0) return price;
+      } catch(e) {}
+    }
+  }
+
+  // Try Cloudflare Worker (server-side, no CORS) — handles both stocks and crypto
   try {
     const workerUrl = `https://wealthai.elwin653.workers.dev/price?ticker=${encodeURIComponent(symbol)}`;
     const res = await fetch(workerUrl, { signal: AbortSignal.timeout(10000) });
     if (res.ok) {
-      const data = await res.json();
+      const text = await res.text();
+      // Worker may return Yahoo chart JSON or a simple {price:...} object
+      const price = parseYahooLive(text, invCurrency);
+      if (price && price > 0) return price;
+      const data = JSON.parse(text);
       const p = parseFloat(data?.price || data?.regularMarketPrice);
       if (p > 0) {
         const cur = data?.currency || 'USD';
-        if (cur === 'USD' && invCurrency !== 'USD') return p * getLiveRate('USD', invCurrency);
         if (cur === 'MYR' && invCurrency !== 'MYR') return p * getLiveRate('MYR', invCurrency);
+        if (cur === 'USD' && invCurrency !== 'USD') return p * getLiveRate('USD', invCurrency);
         return p;
       }
     }
   } catch(e) {}
 
-  // ── Source 2: Stooq.com CSV (free, reliable, no auth needed) ──
+  // Stooq.com CSV fallback
   try {
     const stooqSym = toStooqSymbol(symbol);
     const stooqUrl = `https://stooq.com/q/l/?s=${encodeURIComponent(stooqSym)}&f=sd2t2ohlcv&h&e=csv`;
-    const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(stooqUrl)}`;
-    const res = await fetch(proxyUrl, { signal: AbortSignal.timeout(10000) });
-    if (res.ok) {
-      const text = await res.text();
-      const price = parseStooqCsv(text, invCurrency, symbol);
-      if (price && price > 0) return price;
+    for (const proxy of proxies.slice(0, 2)) {
+      try {
+        const url = proxy.endsWith('/fetch/') ? proxy + stooqUrl : proxy + encodeURIComponent(stooqUrl);
+        const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
+        if (!res.ok) continue;
+        const text = await res.text();
+        const price = parseStooqCsv(text, invCurrency, symbol);
+        if (price && price > 0) return price;
+      } catch(e) {}
     }
   } catch(e) {}
-
-  // ── Source 3: Stooq via corsproxy ──
-  try {
-    const stooqSym = toStooqSymbol(symbol);
-    const stooqUrl = `https://stooq.com/q/l/?s=${encodeURIComponent(stooqSym)}&f=sd2t2ohlcv&h&e=csv`;
-    const proxyUrl = `https://corsproxy.io/?url=${encodeURIComponent(stooqUrl)}`;
-    const res = await fetch(proxyUrl, { signal: AbortSignal.timeout(10000) });
-    if (res.ok) {
-      const text = await res.text();
-      const price = parseStooqCsv(text, invCurrency, symbol);
-      if (price && price > 0) return price;
-    }
-  } catch(e) {}
-
-  // ── Source 4: Yahoo Finance v8 via remaining proxies ──
-  const yahooUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=5d`;
-  for (const proxyUrl of [
-    `https://api.allorigins.win/raw?url=${encodeURIComponent(yahooUrl)}`,
-    `https://corsproxy.io/?url=${encodeURIComponent(yahooUrl)}`,
-    `https://api.allorigins.win/raw?url=${encodeURIComponent(yahooUrl.replace('query1', 'query2'))}`,
-  ]) {
-    try {
-      const res = await fetch(proxyUrl, { signal: AbortSignal.timeout(10000) });
-      if (!res.ok) continue;
-      const text = await res.text();
-      const price = parseYahooLive(text, invCurrency);
-      if (price) return price;
-    } catch(e) {}
-  }
 
   throw new Error('Could not fetch price for ' + ticker + ' — try again or enter manually');
 }
