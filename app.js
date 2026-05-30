@@ -56,7 +56,8 @@ let state = {
   language: 'en',
   navTabs: ['dashboard', 'wallet', 'transactions', 'investments'],
   accounts: [],
-  recurringIncome: []
+  recurringIncome: [],
+  aiDefaultWalletId: ''
 };
 
 // ── Constants ───────────────────────────────────────────
@@ -3072,6 +3073,17 @@ window.renderSettingsPage = function() {
       keyStatus.textContent = 'No key saved yet';
     }
   }
+
+  // AI default wallet dropdown
+  var aiWalletSel = document.getElementById('settings-ai-default-wallet');
+  if (aiWalletSel) {
+    var aiWalletOptions = '<option value="">— No default (always ask) —</option>';
+    (state.accounts || []).forEach(function(a) {
+      var sel = a.id === (state.aiDefaultWalletId || '') ? ' selected' : '';
+      aiWalletOptions += '<option value="' + a.id + '"' + sel + '>' + (a.icon || '') + ' ' + a.name + '</option>';
+    });
+    aiWalletSel.innerHTML = aiWalletOptions;
+  }
 };
 
 window.saveGeminiKey = function() {
@@ -3083,6 +3095,17 @@ window.saveGeminiKey = function() {
   save();
   window.renderSettingsPage();
   toast('✓ API key saved! Go to AI Advisor to start chatting.', 'success');
+};
+
+window.saveAiDefaultWallet = function(walletId) {
+  state.aiDefaultWalletId = walletId || '';
+  save();
+  var label = '';
+  if (walletId) {
+    var w = (state.accounts || []).find(function(a) { return a.id === walletId; });
+    label = w ? (w.icon || '') + ' ' + w.name : '';
+  }
+  toast(walletId ? ('⭐ Default wallet set to ' + label) : 'Default wallet cleared', 'success');
 };
 
 // (CURRENCIES, fxRates, fxLastFetched are declared at the top of the file)
@@ -3364,18 +3387,20 @@ function buildAiTxnCard(txnData) {
   var bg = isIncome ? 'rgba(52,211,153,0.10)' : 'rgba(248,113,113,0.10)';
   var sign = isIncome ? '+' : '−';
 
-  // Find matching wallet
-  var walletLabel = 'No wallet';
+  var accounts = state.accounts || [];
+  var noWallets = accounts.length === 0;
+
+  // 1. Try to match what the AI mentioned by name
+  var aiMentionedWallet = false;
   var matchedWalletId = '';
-  if (txnData.walletName && (state.accounts || []).length) {
+  if (txnData.walletName && accounts.length) {
     var needle = (txnData.walletName || '').toLowerCase();
-    var best = state.accounts.reduce(function(found, a) {
+    var best = accounts.reduce(function(found, a) {
       var score = 0;
       var aName = a.name.toLowerCase();
       if (aName === needle) score = 100;
       else if (aName.includes(needle) || needle.includes(aName)) score = 50;
       else {
-        // word overlap
         var words = needle.split(/\s+/);
         words.forEach(function(w) { if (w.length > 2 && aName.includes(w)) score += 10; });
       }
@@ -3383,22 +3408,53 @@ function buildAiTxnCard(txnData) {
     }, { account: null, score: 0 });
     if (best.account && best.score > 0) {
       matchedWalletId = best.account.id;
-      walletLabel = (best.account.icon || '') + ' ' + best.account.name;
+      aiMentionedWallet = true;
     }
   }
 
-  // Encode txnData + walletId for the onclick
-  var payload = JSON.stringify({
+  // 2. Fall back to user's default wallet if AI didn't mention one
+  if (!matchedWalletId && state.aiDefaultWalletId) {
+    var defWallet = accounts.find(function(a) { return a.id === state.aiDefaultWalletId; });
+    if (defWallet) matchedWalletId = defWallet.id;
+  }
+
+  // 3. Build card-level wallet selector (always shown when wallets exist)
+  //    Uses a unique card id so the select's onchange can update the hidden payload field
+  var cardId = 'ai-txn-card-' + (++_aiMsgCounter);
+
+  var basePayload = {
     type: txnData.type,
     desc: txnData.desc || '',
     amount: txnData.amount || 0,
-    cat: txnData.cat || 'Other',
-    walletId: matchedWalletId
-  }).replace(/'/g, '&apos;');
+    cat: txnData.cat || 'Other'
+  };
 
-  var noWallets = !state.accounts || state.accounts.length === 0;
+  var walletSelectorHtml = '';
+  if (!noWallets) {
+    var options = accounts.map(function(a) {
+      var sel = a.id === matchedWalletId ? ' selected' : '';
+      return '<option value="' + a.id + '"' + sel + '>' + (a.icon || '') + ' ' + a.name + '</option>';
+    }).join('');
+    walletSelectorHtml =
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;align-items:center;margin-top:2px">' +
+        '<div style="font-size:12px;color:var(--text-muted)">Wallet</div>' +
+        '<select id="' + cardId + '-wallet" ' +
+          'style="font-size:12px;font-weight:600;padding:4px 6px;border-radius:6px;border:1px solid var(--border);background:var(--bg-elevated);color:var(--text-primary);font-family:inherit;width:100%">' +
+          options +
+        '</select>' +
+      '</div>';
+    if (aiMentionedWallet) {
+      walletSelectorHtml +=
+        '<div style="font-size:11px;color:var(--text-muted);margin-top:4px;margin-bottom:2px">✨ Matched from your message — change if needed</div>';
+    } else if (state.aiDefaultWalletId && matchedWalletId) {
+      walletSelectorHtml +=
+        '<div style="font-size:11px;color:var(--text-muted);margin-top:4px;margin-bottom:2px">⭐ Using your default wallet — change if needed</div>';
+    }
+  }
 
-  var cancelBtn = '<button onclick="this.closest(\'[data-txn-card]\').outerHTML=\'<div style=&quot;margin-top:8px;padding:6px 12px;background:var(--bg-elevated);border:1px solid var(--border);border-radius:8px;font-size:12px;color:var(--text-muted);display:inline-block&quot;>✗ Cancelled</div>\'" style="flex:1;padding:8px 10px;background:var(--bg-elevated);color:var(--text-muted);border:1px solid var(--border);border-radius:8px;font-size:13px;cursor:pointer">✗ Cancel</button>';
+  var cancelBtn =
+    '<button onclick="this.closest(\'[data-txn-card]\').outerHTML=\'<div style=&quot;margin-top:8px;padding:6px 12px;background:var(--bg-elevated);border:1px solid var(--border);border-radius:8px;font-size:12px;color:var(--text-muted);display:inline-block&quot;>✗ Cancelled</div>\'" ' +
+    'style="flex:1;padding:8px 10px;background:var(--bg-elevated);color:var(--text-muted);border:1px solid var(--border);border-radius:8px;font-size:13px;cursor:pointer">✗ Cancel</button>';
 
   var actionButtons;
   if (noWallets) {
@@ -3411,17 +3467,19 @@ function buildAiTxnCard(txnData) {
         cancelBtn +
       '</div>';
   } else {
+    // The confirm button reads the wallet dropdown at click time
+    var encodedBase = JSON.stringify(basePayload).replace(/'/g, '&apos;').replace(/"/g, '&quot;');
     actionButtons =
-      '<div style="display:flex;gap:8px">' +
-        '<button onclick="confirmAiTransaction(\'' + payload.replace(/\\/g,'\\\\').replace(/"/g,'&quot;') + '\')" ' +
+      '<div style="display:flex;gap:8px;margin-top:10px">' +
+        '<button onclick="confirmAiTransactionFromCard(\'' + cardId + '\',\'' + encodedBase + '\')" ' +
           'style="flex:2;padding:8px 14px;background:' + color + ';color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer">✅ Add Transaction</button>' +
         cancelBtn +
       '</div>';
   }
 
-  return '<div data-txn-card="1" style="margin-top:12px;background:' + bg + ';border:1.5px solid ' + color + ';border-radius:12px;padding:14px">' +
+  return '<div data-txn-card="1" id="' + cardId + '" style="margin-top:12px;background:' + bg + ';border:1.5px solid ' + color + ';border-radius:12px;padding:14px">' +
     '<div style="font-size:11px;font-weight:700;color:' + color + ';text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px">📋 Transaction to Add</div>' +
-    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:10px">' +
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:6px">' +
       '<div style="font-size:12px;color:var(--text-muted)">Type</div>' +
       '<div style="font-size:12px;font-weight:600;color:' + color + '">' + (isIncome ? '↑ Income' : '↓ Expense') + '</div>' +
       '<div style="font-size:12px;color:var(--text-muted)">Description</div>' +
@@ -3430,14 +3488,60 @@ function buildAiTxnCard(txnData) {
       '<div style="font-size:13px;font-weight:700;color:' + color + '">' + sign + sym + parseFloat(txnData.amount || 0).toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2}) + '</div>' +
       '<div style="font-size:12px;color:var(--text-muted)">Category</div>' +
       '<div style="font-size:12px;font-weight:600">' + (txnData.cat || 'Other') + '</div>' +
-      (noWallets ? '' :
-        '<div style="font-size:12px;color:var(--text-muted)">Wallet</div>' +
-        '<div style="font-size:12px;font-weight:600">' + walletLabel + '</div>'
-      ) +
     '</div>' +
+    walletSelectorHtml +
     actionButtons +
   '</div>';
 }
+
+// Called by new card-based AI transaction confirm (reads wallet dropdown at click time)
+window.confirmAiTransactionFromCard = function(cardId, encodedBase) {
+  try {
+    if (!state.accounts || state.accounts.length === 0) {
+      toast('⚠️ Please add a wallet first before recording transactions.', 'error');
+      navigate('wallet');
+      return;
+    }
+    var baseData = JSON.parse(encodedBase.replace(/&apos;/g, "'").replace(/&quot;/g, '"'));
+    var walletSel = document.getElementById(cardId + '-wallet');
+    var walletId = walletSel ? walletSel.value : '';
+
+    var today = new Date().toISOString().slice(0, 10);
+    var newTxn = {
+      id: uid(),
+      type: baseData.type,
+      desc: baseData.desc,
+      amount: parseFloat(baseData.amount) || 0,
+      cat: baseData.cat || 'Other',
+      date: today,
+      createdAt: Date.now()
+    };
+    if (walletId) {
+      newTxn.walletId = walletId;
+      var wa = (state.accounts || []).find(function(a) { return a.id === walletId; });
+      if (wa) wa.balance += (baseData.type === 'income' ? newTxn.amount : -newTxn.amount);
+    }
+    state.transactions.push(newTxn);
+    save();
+    renderAll();
+    var sym = curr();
+    var sign = baseData.type === 'income' ? '+' : '−';
+    var walletName = walletId ? (function() {
+      var w = (state.accounts || []).find(function(a) { return a.id === walletId; });
+      return w ? ' → ' + (w.icon || '') + ' ' + w.name : '';
+    })() : '';
+    var card = document.getElementById(cardId);
+    if (card) {
+      card.outerHTML =
+        '<div style="margin-top:10px;padding:10px 14px;background:rgba(52,211,153,0.12);border:1px solid var(--green);border-radius:10px;font-size:13px;color:var(--green);font-weight:600">' +
+          '✅ ' + sign + sym + parseFloat(baseData.amount).toLocaleString('en-US', {minimumFractionDigits:2}) + ' ' + baseData.desc + walletName +
+        '</div>';
+    }
+    toast('Transaction added via AI ✓', 'success');
+  } catch(e) {
+    toast('Could not add transaction — please try again', 'error');
+  }
+};
 
 window.confirmAiTransaction = function(payloadStr) {
   try {
