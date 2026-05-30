@@ -1535,6 +1535,12 @@ function showPriceCard(currentPrice, buyPrice, qty, invCurr, purchaseDate, lastU
 }
 
 async function invFetchPrice() {
+  // Cancel any previous in-flight fetch for this ticker
+  if (window._invFetchAbortCtrl) {
+    try { window._invFetchAbortCtrl.abort(); } catch(e) {}
+  }
+  window._invFetchAbortCtrl = new AbortController();
+
   const ticker   = document.getElementById('inv-name').value.trim().toUpperCase();
   const typeEl   = document.getElementById('inv-type');
   const dateEl   = document.getElementById('inv-date');
@@ -1637,7 +1643,28 @@ async function invFetchPrice() {
 
   btn.disabled = false;
   btn.innerHTML = REFRESH_SVG + ' Fetch Price';
+  window._invFetchAbortCtrl = null;
 }
+
+// Called when user changes the ticker — clears stale fetch data
+window.invClearFetch = function() {
+  if (window._invFetchAbortCtrl) {
+    try { window._invFetchAbortCtrl.abort(); } catch(e) {}
+    window._invFetchAbortCtrl = null;
+  }
+  var btn = document.getElementById('inv-fetch-btn');
+  if (btn) {
+    delete btn.dataset.fetchedCurrentPrice;
+    delete btn.dataset.fetchedBuyPrice;
+    delete btn.dataset.fetchedAt;
+    btn.disabled = false;
+    btn.innerHTML = REFRESH_SVG + ' Fetch Price';
+  }
+  var resultEl = document.getElementById('inv-fetch-result');
+  if (resultEl) { resultEl.style.display = 'none'; resultEl.innerHTML = ''; }
+  var statusEl = document.getElementById('inv-save-status');
+  if (statusEl) statusEl.textContent = '';
+};
 
 
 // Recalculate P&L preview when qty changes after fetch
@@ -3431,8 +3458,7 @@ function buildAiTxnCard(txnData) {
   var walletSelectorHtml = '';
   if (!noWallets) {
     var options = accounts.map(function(a) {
-      var sel = a.id === matchedWalletId ? ' selected' : '';
-      return '<option value="' + a.id + '"' + sel + '>' + (a.icon || '') + ' ' + a.name + '</option>';
+      return '<option value="' + a.id + '">' + (a.icon || '') + ' ' + a.name + '</option>';
     }).join('');
     walletSelectorHtml =
       '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;align-items:center;margin-top:2px">' +
@@ -3543,6 +3569,79 @@ window.confirmAiTransactionFromCard = function(cardId, encodedBase) {
   }
 };
 
+// ── AI Goal Progress Card ─────────────────────────────────
+function buildAiGoalCard(goalData) {
+  var sym = curr();
+  var name = goalData.name || '';
+  var amount = parseFloat(goalData.amount) || 0;
+
+  // Find best-matching goal
+  var goals = state.goals || [];
+  var needle = name.toLowerCase();
+  var matched = goals.reduce(function(best, g) {
+    var gName = g.name.toLowerCase();
+    var score = 0;
+    if (gName === needle) score = 100;
+    else if (gName.includes(needle) || needle.includes(gName)) score = 50;
+    else {
+      needle.split(/\s+/).forEach(function(w) { if (w.length > 2 && gName.includes(w)) score += 10; });
+    }
+    return score > (best.score || 0) ? { goal: g, score: score } : best;
+  }, { goal: null, score: 0 });
+
+  if (!matched.goal) {
+    return '<div style="margin-top:10px;padding:10px 14px;background:rgba(248,113,113,0.10);border:1px solid var(--red);border-radius:10px;font-size:13px;color:var(--red)">' +
+      '⚠️ Could not find a goal matching "' + name + '". Check your goals in the Goals page.' +
+    '</div>';
+  }
+
+  var g = matched.goal;
+  var newCurrent = Math.min(g.target, (g.current || 0) + amount);
+  var newPct = g.target > 0 ? Math.min(100, Math.round((newCurrent / g.target) * 100)) : 0;
+  var oldPct = g.target > 0 ? Math.min(100, Math.round(((g.current||0) / g.target) * 100)) : 0;
+  var color = 'var(--accent)';
+  var encodedId = g.id.replace(/'/g, '&apos;');
+  var cardId = 'ai-goal-card-' + (++_aiCardCounter);
+
+  return '<div id="' + cardId + '" data-goal-card="1" style="margin-top:12px;background:rgba(99,102,241,0.08);border:1.5px solid var(--accent);border-radius:12px;padding:14px">' +
+    '<div style="font-size:11px;font-weight:700;color:' + color + ';text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px">🎯 Goal Progress Update</div>' +
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:10px">' +
+      '<div style="font-size:12px;color:var(--text-muted)">Goal</div>' +
+      '<div style="font-size:12px;font-weight:600">' + (g.icon || '🎯') + ' ' + g.name + '</div>' +
+      '<div style="font-size:12px;color:var(--text-muted)">Adding</div>' +
+      '<div style="font-size:13px;font-weight:700;color:' + color + '">+' + sym + amount.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2}) + '</div>' +
+      '<div style="font-size:12px;color:var(--text-muted)">Progress</div>' +
+      '<div style="font-size:12px;font-weight:600">' + oldPct + '% → ' + newPct + '%</div>' +
+    '</div>' +
+    '<div style="height:6px;background:var(--border);border-radius:99px;overflow:hidden;margin-bottom:10px">' +
+      '<div style="height:100%;width:' + newPct + '%;background:' + color + ';border-radius:99px"></div>' +
+    '</div>' +
+    '<div style="display:flex;gap:8px">' +
+      '<button onclick="window.confirmAiGoal(\'' + encodedId + '\',' + amount + ',\'' + cardId + '\')" ' +
+        'style="flex:2;padding:8px 14px;background:var(--accent);color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer">✅ Update Goal</button>' +
+      '<button onclick="this.closest(\'[data-goal-card]\').outerHTML=\'<div style=&quot;margin-top:8px;padding:6px 12px;background:var(--bg-elevated);border:1px solid var(--border);border-radius:8px;font-size:12px;color:var(--text-muted);display:inline-block&quot;>✗ Cancelled</div>\'" ' +
+        'style="flex:1;padding:8px 10px;background:var(--bg-elevated);color:var(--text-muted);border:1px solid var(--border);border-radius:8px;font-size:13px;cursor:pointer">✗ Cancel</button>' +
+    '</div>' +
+  '</div>';
+}
+
+window.confirmAiGoal = function(goalId, amount, cardId) {
+  var g = (state.goals || []).find(function(x) { return x.id === goalId; });
+  if (!g) { toast('Goal not found', 'error'); return; }
+  var added = parseFloat(amount) || 0;
+  g.current = Math.min(g.target, (g.current || 0) + added);
+  save();
+  renderAll();
+  var sym = curr();
+  var card = document.getElementById(cardId);
+  if (card) {
+    card.outerHTML = '<div style="margin-top:10px;padding:10px 14px;background:rgba(99,102,241,0.12);border:1px solid var(--accent);border-radius:10px;font-size:13px;color:var(--accent);font-weight:600">' +
+      '✅ Added ' + sym + added.toLocaleString('en-US', {minimumFractionDigits:2}) + ' to ' + (g.icon || '🎯') + ' ' + g.name +
+    '</div>';
+  }
+  toast('Goal updated ✓', 'success');
+};
+
 window.confirmAiTransaction = function(payloadStr) {
   try {
     var txnData = JSON.parse(payloadStr.replace(/&apos;/g,"'").replace(/&quot;/g,'"'));
@@ -3651,6 +3750,14 @@ window.sendAiMessage = async function() {
       '- ONE block only per response, at the very end\n' +
       '- Do NOT calculate or update balances yourself — the app handles that\n' +
       '- IMPORTANT: when recording a transaction, keep your reply SHORT — one sentence confirming the details, then the block. Do NOT give financial advice or commentary when the user just wants to log a transaction.\n\n' +
+      'GOAL PROGRESS RECORDING: When the user asks to add money to, update, or record progress on a specific goal (e.g. "add 500 to my retirement fund goal", "I saved 200 towards my vacation"), output a [GOAL:{...}] block at the very END of your reply.\n' +
+      'Use EXACTLY this format:\n' +
+      '[GOAL:{"name":"Retirement Fund","amount":500}]\n' +
+      'GOAL RULES:\n' +
+      '- name: must exactly match (or closely match) the goal name from the financial context\n' +
+      '- amount: the amount to ADD to the goal current progress (number only, no currency symbol)\n' +
+      '- ONE block only, at the very end\n' +
+      '- Only output [GOAL:{...}] when the user explicitly mentions adding to or updating a specific goal\n\n' +
       buildFinancialContext();
 
     // Try multiple model names in case one is unavailable
@@ -3722,6 +3829,8 @@ window.sendAiMessage = async function() {
     if (typingEl && typingEl.classList.contains('ai-msg-assistant')) {
       // Check for [TXN:{...}] block — ONLY match with square brackets (strict, no false positives)
       var txnMatch = reply.match(/\[TXN:(\{[\s\S]*?\})\]/);
+      // Check for [GOAL:{...}] block
+      var goalMatch = reply.match(/\[GOAL:(\{[\s\S]*?\})\]/);
       var displayReply = reply;
       if (txnMatch) {
         // Strip the raw TXN block from visible text
@@ -3733,15 +3842,37 @@ window.sendAiMessage = async function() {
           // Force wallet select to the pre-chosen wallet AFTER DOM insertion
           // (innerHTML injection doesn't reliably honour `selected` attribute in all browsers)
           if (cardResult.cardId) {
-            // Use setTimeout(0) to guarantee DOM is fully painted before forcing select value
+            // Force wallet select AFTER browser paint — 50ms is reliable on mobile Safari
             (function(cId, wId) {
               setTimeout(function() {
                 var selEl = document.getElementById(cId + '-wallet');
-                if (selEl && wId) selEl.value = wId;
-              }, 0);
+                if (selEl) {
+                  // Set by value first; if not found (e.g. empty wId), leave first option
+                  if (wId) selEl.value = wId;
+                  // Verify it actually changed — if not, iterate options to force it
+                  if (wId && selEl.value !== wId) {
+                    for (var oi = 0; oi < selEl.options.length; oi++) {
+                      if (selEl.options[oi].value === wId) {
+                        selEl.selectedIndex = oi;
+                        break;
+                      }
+                    }
+                  }
+                }
+              }, 50);
             })(cardResult.cardId, cardResult.walletId);
           }
         } catch(parseErr) {
+          typingEl.querySelector('.ai-msg-bubble').innerHTML = escapeHtml(displayReply);
+        }
+      } else if (goalMatch) {
+        // Strip the GOAL block from visible text
+        displayReply = reply.replace(/\[GOAL:\{[\s\S]*?\}\]/g, '').trim();
+        try {
+          var goalData = JSON.parse(goalMatch[1]);
+          var goalCardHtml = buildAiGoalCard(goalData);
+          typingEl.querySelector('.ai-msg-bubble').innerHTML = escapeHtml(displayReply) + goalCardHtml;
+        } catch(e) {
           typingEl.querySelector('.ai-msg-bubble').innerHTML = escapeHtml(displayReply);
         }
       } else {
@@ -3752,8 +3883,8 @@ window.sendAiMessage = async function() {
       appendAiMessage('assistant', reply, false);
     }
 
-    // Store in history WITHOUT the TXN block so it doesn't trigger again next message
-    var historyReply = reply.replace(/\[TXN:\{[\s\S]*?\}\]/g, '').trim();
+    // Store in history WITHOUT the TXN/GOAL blocks so they don't retrigger
+    var historyReply = reply.replace(/\[TXN:\{[\s\S]*?\}\]/g, '').replace(/\[GOAL:\{[\s\S]*?\}\]/g, '').trim();
     aiHistory.push({ role: 'model', parts: [{ text: historyReply }] });
     if (aiHistory.length > 20) aiHistory = aiHistory.slice(-20);
 
